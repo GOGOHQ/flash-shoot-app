@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_baidu_mapapi_map/flutter_baidu_mapapi_map.dart';
 import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
@@ -75,7 +76,7 @@ class _MapScreenState extends State<MapScreen> {
       await _requestLocationPermission();
       await _startLocation();
     } catch (e) {
-      print('百度地图初始化失败: $e');
+      debugPrint('百度地图初始化失败: $e');
     }
   }
 
@@ -85,7 +86,7 @@ class _MapScreenState extends State<MapScreen> {
     if (status != PermissionStatus.granted) {
       status = await Permission.location.request();
       if (status != PermissionStatus.granted) {
-        print('定位权限被拒绝');
+        debugPrint('定位权限被拒绝');
       }
     }
   }
@@ -111,7 +112,7 @@ class _MapScreenState extends State<MapScreen> {
       // 更新地图到当前位置
       _updateMapToCurrentLocation();
     } catch (e) {
-      print('开始定位失败: $e');
+      debugPrint('开始定位失败: $e');
       setState(() {
         _isLocating = false;
       });
@@ -138,8 +139,8 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     try {
-      print('开始搜索: $keyword');
-      print('当前位置: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
+      debugPrint('开始搜索: $keyword');
+      debugPrint('当前位置: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
       
       final places = await _apiService.searchPlaces(
         q: keyword,
@@ -148,7 +149,7 @@ class _MapScreenState extends State<MapScreen> {
         limit: 20,
       );
       
-      print('搜索成功，找到 ${places.results.length} 个结果');
+      debugPrint('搜索成功，找到 ${places.results.length} 个结果');
       
       // 导航到搜索结果页面
       Navigator.push(
@@ -161,7 +162,7 @@ class _MapScreenState extends State<MapScreen> {
         ),
       );
     } catch (e) {
-      print('搜索失败: $e');
+      debugPrint('搜索失败: $e');
       _showSnackBar('搜索失败: 请检查网络连接或稍后重试');
       
       // 显示模拟数据用于测试
@@ -345,7 +346,7 @@ class _MapScreenState extends State<MapScreen> {
         BMFMapWidget(
           onBMFMapCreated: (BMFMapController controller) {
             _mapController = controller;
-            print('百度地图创建成功');
+            debugPrint('百度地图创建成功');
             _setupMapCallbacks();
           },
           mapOptions: _getMapOptions(),
@@ -440,19 +441,19 @@ class _MapScreenState extends State<MapScreen> {
     // 地图渲染每一帧画面过程中，以及每次需要重绘地图时都会调用此接口
     _mapController!.setMapOnDrawMapFrameCallback(
         callback: (BMFMapStatus mapStatus) {
-      // print('地图渲染每一帧: ${mapStatus.toMap()}');
+      // debugPrint('地图渲染每一帧: ${mapStatus.toMap()}');
     });
 
     // 地图区域即将改变时会调用此接口
     _mapController!.setMapRegionWillChangeCallback(
         callback: (BMFMapStatus mapStatus) {
-      print('地图区域即将改变: ${mapStatus.toMap()}');
+      debugPrint('地图区域即将改变: ${mapStatus.toMap()}');
     });
 
     // 地图区域改变完成后会调用此接口
     _mapController!.setMapRegionDidChangeCallback(
         callback: (BMFMapStatus mapStatus) {
-      print('地图区域改变完成: ${mapStatus.toMap()}');
+      debugPrint('地图区域改变完成: ${mapStatus.toMap()}');
     });
   }
 
