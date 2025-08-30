@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
   <key>NSCameraUsageDescription</key>
-  <string>闪拍需要使用相机来拍照</string>
+  <string>需要访问相机以拍摄照片</string>
   <key>NSPhotoLibraryUsageDescription</key>
-  <string>需要相册预览</string>
+  <string>需要访问相册以保存和选择照片</string>
   <key>NSPhotoLibraryAddUsageDescription</key>
-  <string>需要保存照片到相册</string>
+  <string>需要写入权限以保存拍摄的照片</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

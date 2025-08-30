@@ -1,297 +1,114 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import 'package:flutter_svg/flutter_svg.dart';
-import 'package:gallery_saver/gallery_saver.dart';
-import 'package:photo_manager/photo_manager.dart';
+import 'config/app_routes.dart';
+import 'utils/app_permissions.dart';
 
-List<CameraDescription> cameras = [];
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized(); // 确保插件初始化
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  cameras = await availableCameras();
-  runApp(const FlashShootApp());
+  // 先检查权限
+  bool granted = await AppPermissions.requestCameraAndStorage();
+
+  runApp(FlashShootApp(hasPermission: granted));
 }
 
 class FlashShootApp extends StatelessWidget {
-  const FlashShootApp({super.key});
+  final bool hasPermission;
+  const FlashShootApp({super.key, required this.hasPermission});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: CameraWithOverlay(),
+    return MaterialApp(
+      title: '魔拍',
+      theme: ThemeData(
+        primaryColor: Colors.white,
+        scaffoldBackgroundColor: Colors.white,
+        canvasColor: Colors.white,
+        cardColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          foregroundColor: Colors.black,
+        ),
+      ),
+      home: hasPermission 
+          ? const PermissionGrantedScreen()
+          : const PermissionDeniedScreen(),
+      // initialRoute: null, // 因为我们在上面用 home 判断了
+      onGenerateRoute: AppRoutes.generateRoute,
     );
   }
 }
 
-class CameraWithOverlay extends StatefulWidget {
-  const CameraWithOverlay({super.key});
+/// 权限通过后跳转到正常登录页（或者你原来 initialRoute 的页面）
+class PermissionGrantedScreen extends StatefulWidget {
+  const PermissionGrantedScreen({super.key});
 
   @override
-  _CameraWithOverlayState createState() => _CameraWithOverlayState();
+  State<PermissionGrantedScreen> createState() => _PermissionGrantedScreenState();
 }
-
-class _CameraWithOverlayState extends State<CameraWithOverlay> {
-  late CameraController _controller;
-  bool _initialized = false;
-  bool _showGrid = false;
-
-  // 当前选择的姿势图
-  String? _currentPose;
-
-  // 最近一张保存的照片路径
-  String? _lastSavedPhoto;
-
+class _PermissionGrantedScreenState extends State<PermissionGrantedScreen> {
   @override
   void initState() {
     super.initState();
-    _initCamera();
-  }
-
-  Future<void> _initCamera() async {
-    _controller = CameraController(
-      cameras.first,
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
-    await _controller.initialize();
-    if (!mounted) return;
-    setState(() => _initialized = true);
-  }
-
-  Future<void> _takePicture() async {
-    try {
-      final XFile file = await _controller.takePicture();
-      // 直接保存到相册
-      await GallerySaver.saveImage(file.path, albumName: "FlashShoot");
-      setState(() => _lastSavedPhoto = file.path);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('照片已保存到相册')),
-      );
-    } catch (e) {
-      debugPrint('拍照失败: $e');
-    }
-  }
-
-  void _openGallery() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const GalleryScreen()),
-    );
+    // 在 initState 里跳转一次，不会死循环
+    Future.microtask(() {
+      Navigator.pushReplacementNamed(context, AppRoutes.login);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_initialized) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    return Scaffold(
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          CameraPreview(_controller),
-
-          // 九宫格参考线
-          if (_showGrid)
-            CustomPaint(
-              painter: GridPainter(),
-              size: Size.infinite,
-            ),
-
-          // 叠加 SVG 线稿姿势图
-          if (_currentPose != null)
-            Center(
-              child: SvgPicture.asset(
-                _currentPose!,
-                fit: BoxFit.contain,
-                colorFilter: ColorFilter.mode(
-                  Colors.white.withOpacity(0.6),
-                  BlendMode.srcIn,
-                ),
-              ),
-            ),
-
-          // 右上角按钮
-          Positioned(
-            top: 40,
-            right: 20,
-            child: Column(
-              children: [
-                IconButton(
-                  icon: Icon(_showGrid ? Icons.grid_off : Icons.grid_on,
-                      color: Colors.white),
-                  onPressed: () => setState(() => _showGrid = !_showGrid),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.image, color: Colors.white),
-                  onPressed: () async {
-                    final pose = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const PoseLibrary(),
-                      ),
-                    );
-                    if (pose != null && mounted) {
-                      setState(() => _currentPose = pose);
-                    }
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.photo_library, color: Colors.white),
-                  onPressed: _openGallery,
-                ),
-              ],
-            ),
-          ),
-
-          // 拍照按钮
-          Positioned(
-            bottom: 40,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: FloatingActionButton(
-                backgroundColor: Colors.white,
-                onPressed: _takePicture,
-                child: const Icon(Icons.camera, color: Colors.black),
-              ),
-            ),
-          ),
-        ],
-      ),
+    return const Scaffold(
+      body: Center(child: CircularProgressIndicator()),
     );
+  }
+}
+
+
+
+/// 权限没通过的页面
+class PermissionDeniedScreen extends StatefulWidget {
+  const PermissionDeniedScreen({super.key});
+
+  @override
+  State<PermissionDeniedScreen> createState() => _PermissionDeniedScreenState();
+}
+
+class _PermissionDeniedScreenState extends State<PermissionDeniedScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
-}
-
-class GridPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.4)
-      ..strokeWidth = 1;
-
-    final double thirdWidth = size.width / 3;
-    final double thirdHeight = size.height / 3;
-
-    for (int i = 1; i < 3; i++) {
-      canvas.drawLine(Offset(thirdWidth * i, 0), Offset(thirdWidth * i, size.height), paint);
-      canvas.drawLine(Offset(0, thirdHeight * i), Offset(size.width, thirdHeight * i), paint);
-    }
-  }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class PoseLibrary extends StatelessWidget {
-  const PoseLibrary({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final poses = [
-      "assets/poses/pose1.svg",
-      "assets/poses/pose2.svg",
-      "assets/poses/pose3.svg",
-    ];
-
-    return Scaffold(
-      appBar: AppBar(title: const Text("姿势库")),
-      body: GridView.builder(
-        padding: const EdgeInsets.all(10),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-        ),
-        itemCount: poses.length,
-        itemBuilder: (context, index) {
-          final pose = poses[index];
-          return GestureDetector(
-            onTap: () => Navigator.pop(context, pose),
-            child: Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: SvgPicture.asset(
-                pose,
-                fit: BoxFit.contain,
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class GalleryScreen extends StatefulWidget {
-  const GalleryScreen({super.key});
-
-  @override
-  _GalleryScreenState createState() => _GalleryScreenState();
-}
-
-class _GalleryScreenState extends State<GalleryScreen> {
-  List<AssetEntity> _media = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadGallery();
-  }
-
-  Future<void> _loadGallery() async {
-    final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    if (ps.isAuth) {
-      final List<AssetPathEntity> albums =
-          await PhotoManager.getAssetPathList(type: RequestType.image);
-      final List<AssetEntity> media =
-          await albums.first.getAssetListPaged(page: 0, size: 100);
-      setState(() => _media = media);
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    // 当 App 从后台切回前台时
+    if (state == AppLifecycleState.resumed) {
+      bool granted = await AppPermissions.requestCameraAndStorage();
+      if (granted && mounted) {
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("相册预览")),
-      body: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          crossAxisSpacing: 2,
-          mainAxisSpacing: 2,
+      body: Center(
+        child: ElevatedButton(
+          child: const Text("需要相机和相册权限，点击前往设置"),
+          onPressed: () async {
+            await AppPermissions.openAppSettingsPage();
+          },
         ),
-        itemCount: _media.length,
-        itemBuilder: (context, index) {
-          final asset = _media[index];
-          return FutureBuilder<Uint8List?>(
-            future: asset.thumbnailDataWithSize(const ThumbnailSize(300, 300)),
-            builder: (_, snapshot) {
-              if (snapshot.connectionState == ConnectionState.done &&
-                  snapshot.hasData) {
-                return Image.memory(
-                  snapshot.data!,
-                  fit: BoxFit.cover,
-                );
-              }
-              return Container(color: Colors.grey);
-            },
-          );
-        },
       ),
     );
   }
 }
+

@@ -7,7 +7,12 @@ PODS:
   - path_provider_foundation (0.0.1):
     - Flutter
     - FlutterMacOS
+  - permission_handler_apple (9.3.0):
+    - Flutter
   - photo_manager (3.7.1):
+    - Flutter
+    - FlutterMacOS
+  - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
 
@@ -16,7 +21,9 @@ DEPENDENCIES:
   - Flutter (from `Flutter`)
   - gallery_saver (from `.symlinks/plugins/gallery_saver/ios`)
   - path_provider_foundation (from `.symlinks/plugins/path_provider_foundation/darwin`)
+  - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
   - photo_manager (from `.symlinks/plugins/photo_manager/ios`)
+  - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
 
 EXTERNAL SOURCES:
   camera_avfoundation:
@@ -27,15 +34,21 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/gallery_saver/ios"
   path_provider_foundation:
     :path: ".symlinks/plugins/path_provider_foundation/darwin"
+  permission_handler_apple:
+    :path: ".symlinks/plugins/permission_handler_apple/ios"
   photo_manager:
     :path: ".symlinks/plugins/photo_manager/ios"
+  sqflite_darwin:
+    :path: ".symlinks/plugins/sqflite_darwin/darwin"
 
 SPEC CHECKSUMS:
   camera_avfoundation: adb0207d868b2d873e895371d88448399ab78d87
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   gallery_saver: 9fc173c9f4fcc48af53b2a9ebea1b643255be542
   path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
+  permission_handler_apple: 9878588469a2b0d0fc1e048d9f43605f92e6cec2
   photo_manager: 81954a1bf804b6e882d0453b3b6bc7fad7b47d3d
+  sqflite_darwin: 5a7236e3b501866c1c9befc6771dfd73ffb8702d
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 
