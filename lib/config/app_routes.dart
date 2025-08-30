@@ -10,6 +10,8 @@ import '../screens/messages_screen.dart';
 import '../screens/search_screen.dart';
 import '../screens/search_result_screen.dart';
 import '../screens/pose_library_screen.dart';
+import '../screens/api_test_screen.dart';
+import '../screens/network_test_screen.dart';
 
 
 
@@ -25,6 +27,8 @@ class AppRoutes {
   static const String search = '/search';
   static const String result = '/result';
   static const String poseLibrary = '/poseLibrary';
+  static const String apiTest = '/apiTest';
+  static const String networkTest = '/networkTest';
 
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -50,6 +54,10 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const SearchResultScreen());
       case poseLibrary:
         return MaterialPageRoute(builder: (_) => const PoseLibraryScreen());
+      case apiTest:
+        return MaterialPageRoute(builder: (_) => const ApiTestScreen());
+      case networkTest:
+        return MaterialPageRoute(builder: (_) => const NetworkTestScreen());
       default:
         return MaterialPageRoute(
           builder: (_) => const Scaffold(

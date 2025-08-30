@@ -174,6 +174,46 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_baidu_mapapi_base:
+    dependency: "direct main"
+    description:
+      name: flutter_baidu_mapapi_base
+      sha256: c8b372f0862690a438ec12e7978d937d775d71a5027632a149448ac4e52b1259
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.9.5"
+  flutter_baidu_mapapi_map:
+    dependency: "direct main"
+    description:
+      name: flutter_baidu_mapapi_map
+      sha256: a4ab01a32ffb76c93bcb9b6629736064ce7f0918c58ea3b8468dcb886326d5fb
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.9.5"
+  flutter_baidu_mapapi_search:
+    dependency: "direct main"
+    description:
+      name: flutter_baidu_mapapi_search
+      sha256: fa17f0026c7b48ca5ed453a46369fb3fa6654dda404aa47a90a83b548489ba77
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.9.5"
+  flutter_baidu_mapapi_utils:
+    dependency: "direct main"
+    description:
+      name: flutter_baidu_mapapi_utils
+      sha256: "8ff1127ed81e3a5ca48dae6c5377adaf601f90a3d4f6f07eebafc0e415f88fbb"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.9.5"
+  flutter_bmflocation:
+    dependency: "direct main"
+    description:
+      name: flutter_bmflocation
+      sha256: "14d846f7432905d67b5b54d652d2099d12b3e6a12284e8b730fb8a6497860de9"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.8.2"
   flutter_cache_manager:
     dependency: transitive
     description:
@@ -233,7 +273,7 @@ packages:
     source: hosted
     version: "2.3.2"
   http:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http
       sha256: "5895291c13fa8a3bd82e76d5627f69e0d85ca6a30dcac95c4ea19a5d555879c2"

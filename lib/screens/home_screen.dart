@@ -289,9 +289,23 @@ class _HomeScreenState extends State<HomeScreen>  with SingleTickerProviderState
         actions: [
           IconButton(
             onPressed: () {
-              Navigator.pushNamed(context, "/search");
+              Navigator.pushNamed(context, AppRoutes.search);
             },
             icon: const Icon(Icons.search),
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.apiTest);
+            },
+            icon: const Icon(Icons.bug_report),
+            tooltip: 'API 测试',
+          ),
+          IconButton(
+            onPressed: () {
+              Navigator.pushNamed(context, AppRoutes.networkTest);
+            },
+            icon: const Icon(Icons.wifi),
+            tooltip: '网络测试',
           ),
         ],
         bottom: PreferredSize(

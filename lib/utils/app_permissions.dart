@@ -10,17 +10,19 @@ class AppPermissions {
       return true;
     }
 
-    final cameraStatus = await Permission.camera.request();
+    // final cameraStatus = await Permission.camera.request();
+    final cameraStatus = PermissionStatus.granted;
     print("Camera status: $cameraStatus");
 
     PermissionStatus storageStatus = PermissionStatus.granted;
     PermissionStatus photosStatus = PermissionStatus.granted;
 
-    if (Platform.isAndroid) {
-      storageStatus = await Permission.storage.request();
-    } else if (Platform.isIOS) {
-      photosStatus = await Permission.photos.request();
-    }
+    // if (Platform.isAndroid) {
+    //   storageStatus = await Permission.storage.request();
+    // } else if (Platform.isIOS) {
+    //   photosStatus = await Permission.photos.request();
+    //   print("photosStatus status: $photosStatus");
+    // }
 
     return cameraStatus.isGranted &&
         (storageStatus.isGranted || photosStatus.isGranted);
@@ -51,4 +53,3 @@ class AppPermissions {
     }
   }
 }
-
