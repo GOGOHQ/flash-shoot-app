@@ -271,11 +271,14 @@ class PlaceDetailInfo {
       return detailInfo;
     } catch (e) {
       debugPrint('PlaceDetailInfo 解析失败: $e');
-      // 返回默认的 PlaceDetailInfo 对象
+      // 返回默认的 PlaceDetailInfo 对象，但尝试保留navi_location
       return PlaceDetailInfo(
         classifiedPoiTag: '',
         distance: 0,
         tag: '',
+        naviLocation: json['navi_location'] != null 
+            ? Location.fromJson(json['navi_location']) 
+            : null,
         type: '',
         detailUrl: '',
         price: '',
@@ -340,10 +343,10 @@ class Place {
       return place;
     } catch (e) {
       debugPrint('Place 解析失败: $e');
-      // 返回一个默认的 Place 对象
+      // 返回一个默认的 Place 对象，但保留基本信息
       return Place(
         name: json['name'] ?? '未知地点',
-        location: Location(lng: 0, lat: 0),
+        location: Location.fromJson(json['location'] ?? {}),
         address: json['address'] ?? '',
         province: '',
         city: '',
@@ -352,20 +355,8 @@ class Place {
         townCode: 0,
         streetId: '',
         detail: 0,
-        uid: '',
-        detailInfo: PlaceDetailInfo(
-          classifiedPoiTag: '',
-          distance: 0,
-          tag: '',
-          type: '',
-          detailUrl: '',
-          price: '',
-          overallRating: '0',
-          commentNum: '0',
-          shopHours: '',
-          label: '',
-          children: [],
-        ),
+        uid: json['uid'] ?? '',
+        detailInfo: PlaceDetailInfo.fromJson(json['detail_info'] ?? {}),
       );
     }
   }

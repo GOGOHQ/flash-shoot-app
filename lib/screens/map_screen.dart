@@ -6,6 +6,7 @@ import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../config/baidu_map_config.dart';
+import '../config/api_config.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
 import '../widgets/recommendation_bubble.dart';
@@ -204,23 +205,117 @@ class _MapScreenState extends State<MapScreen> {
 
   // 搜索地点
   Future<void> _searchPlaces(String keyword) async {
-    if (_currentLocation == null) {
-      _showSnackBar('请先获取当前位置');
+    if (keyword.trim().isEmpty) {
+      _showSnackBar('请输入搜索关键词');
       return;
     }
 
     try {
-      debugPrint('开始搜索: $keyword');
-      debugPrint('当前位置: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
+      debugPrint('=== 开始搜索流程 ===');
+      debugPrint('搜索关键词: $keyword');
       
+      // 第一步：根据关键词获取经纬度
+      debugPrint('第一步：地理编码获取经纬度');
+      final location = await _apiService.getLocationByAddress(keyword);
+      
+      if (location == null) {
+        debugPrint('地理编码失败，尝试直接搜索');
+        // 如果地理编码失败，尝试直接搜索
+        await _searchPlacesDirectly(keyword);
+        return;
+      }
+      
+      debugPrint('获取到经纬度: ${location.lat}, ${location.lng}');
+      
+      // 第二步：根据经纬度获取地点详情
+      debugPrint('第二步：根据经纬度获取地点详情');
+      final places = await _getPlacesByLocation(location, keyword);
+      
+      if (places.isEmpty) {
+        debugPrint('根据经纬度未找到地点，尝试直接搜索');
+        // 如果根据经纬度未找到地点，尝试直接搜索
+        await _searchPlacesDirectly(keyword);
+        return;
+      }
+      
+      debugPrint('找到 ${places.length} 个地点');
+      
+      // 导航到搜索结果页面
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => SearchResultPage(
+            keyword: keyword,
+            places: places,
+            centerLocation: location,
+          ),
+        ),
+      );
+      
+      debugPrint('=== 搜索流程完成 ===');
+    } catch (e) {
+      debugPrint('搜索失败: $e');
+      _showSnackBar('搜索失败: 请检查网络连接或稍后重试');
+      
+      // 显示模拟数据用于测试
+      _showMockSearchResults(keyword);
+    }
+  }
+
+  // 根据经纬度获取地点详情
+  Future<List<Place>> _getPlacesByLocation(Location location, String keyword) async {
+    try {
+      debugPrint('根据经纬度搜索地点: ${location.lat}, ${location.lng}');
+      
+      // 使用经纬度作为中心点搜索附近的地点
       final places = await _apiService.searchPlaces(
         q: keyword,
-        location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
-        radius: 2000,
+        location: '${location.lat},${location.lng}',
+        radius: 5000, // 5公里范围内搜索
         limit: 20,
       );
       
-      debugPrint('搜索成功，找到 ${places.results.length} 个结果');
+      debugPrint('根据经纬度搜索到 ${places.results.length} 个地点');
+      return places.results;
+    } catch (e) {
+      debugPrint('根据经纬度搜索失败: $e');
+      return [];
+    }
+  }
+
+  // 直接搜索地点（备用方案）
+  Future<void> _searchPlacesDirectly(String keyword) async {
+    try {
+      debugPrint('直接搜索地点: $keyword');
+      
+      String? city;
+      if (_currentLocation != null) {
+        // 尝试根据当前位置获取城市信息
+        try {
+          final address = await _apiService.getAddressByLocation(
+            _currentLocation!.latitude,
+            _currentLocation!.longitude,
+          );
+          if (address != null && address.contains('市')) {
+            // 提取城市名称
+            final cityMatch = RegExp(r'([^省]+市)').firstMatch(address);
+            if (cityMatch != null) {
+              city = cityMatch.group(1);
+              debugPrint('提取到城市: $city');
+            }
+          }
+        } catch (e) {
+          debugPrint('获取城市信息失败: $e');
+        }
+      }
+      
+      final places = await _apiService.searchPlaces(
+        q: keyword,
+        city: city,
+        limit: 20,
+      );
+      
+      debugPrint('直接搜索到 ${places.results.length} 个地点');
       
       // 导航到搜索结果页面
       Navigator.push(
@@ -229,11 +324,14 @@ class _MapScreenState extends State<MapScreen> {
           builder: (context) => SearchResultPage(
             keyword: keyword,
             places: places.results,
+            centerLocation: _currentLocation != null 
+                ? Location(lat: _currentLocation!.latitude, lng: _currentLocation!.longitude)
+                : null,
           ),
         ),
       );
     } catch (e) {
-      debugPrint('搜索失败: $e');
+      debugPrint('直接搜索失败: $e');
       _showSnackBar('搜索失败: 请检查网络连接或稍后重试');
       
       // 显示模拟数据用于测试
@@ -362,6 +460,8 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+
+
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
@@ -420,44 +520,154 @@ class _MapScreenState extends State<MapScreen> {
   Widget _buildSearchBar() {
     return Container(
       padding: const EdgeInsets.all(16),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: '搜索地点...',
-                border: OutlineInputBorder(
+          // 搜索输入框
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(25),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: '搜索地点、地址或关键词...',
+                      border: InputBorder.none,
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                    ),
+                    onChanged: (value) {
+                      setState(() {});
+                    },
+                    onSubmitted: (value) {
+                      if (value.trim().isNotEmpty) {
+                        _searchPlaces(value.trim());
+                      }
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
-                prefixIcon: const Icon(Icons.search),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (_searchController.text.trim().isNotEmpty) {
+                      _searchPlaces(_searchController.text.trim());
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  ),
+                  child: const Text('搜索'),
                 ),
               ),
-              onSubmitted: (value) {
-                if (value.isNotEmpty) {
-                  _searchPlaces(value);
-                }
-              },
-            ),
+
+            ],
           ),
-          const SizedBox(width: 8),
-          ElevatedButton(
-            onPressed: () {
-              if (_searchController.text.isNotEmpty) {
-                _searchPlaces(_searchController.text);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
+          
+          // 搜索建议
+          if (_searchController.text.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '搜索建议:',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _buildSuggestionChip('${_searchController.text}附近'),
+                      _buildSuggestionChip('${_searchController.text}美食'),
+                      _buildSuggestionChip('${_searchController.text}景点'),
+                      _buildSuggestionChip('${_searchController.text}酒店'),
+                    ],
+                  ),
+                ],
               ),
             ),
-            child: const Text('搜索'),
-          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionChip(String suggestion) {
+    return GestureDetector(
+      onTap: () {
+        _searchController.text = suggestion;
+        _searchPlaces(suggestion);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.blue[50],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.blue[200]!),
+        ),
+        child: Text(
+          suggestion,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.blue[700],
+          ),
+        ),
       ),
     );
   }
@@ -605,6 +815,169 @@ class _MapScreenState extends State<MapScreen> {
       logoPosition: BMFLogoPosition.LeftBottom,
       center: center,
       showDEMLayer: true,
+    );
+  }
+}
+
+// 地图搜索结果视图
+class MapSearchResultView extends StatefulWidget {
+  final String keyword;
+  final List<Place> places;
+  final Location centerLocation;
+
+  const MapSearchResultView({
+    super.key,
+    required this.keyword,
+    required this.places,
+    required this.centerLocation,
+  });
+
+  @override
+  State<MapSearchResultView> createState() => _MapSearchResultViewState();
+}
+
+class _MapSearchResultViewState extends State<MapSearchResultView> {
+  BMFMapController? _mapController;
+  bool _isMapReady = false;
+  List<BMFMarker> _markers = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _initBaiduMap();
+  }
+
+  Future<void> _initBaiduMap() async {
+    try {
+      // 设置用户是否同意SDK隐私协议
+      BMFMapSDK.setAgreePrivacy(true);
+
+      // 百度地图sdk初始化鉴权
+      if (Platform.isIOS) {
+        BMFMapSDK.setApiKeyAndCoordType(
+            BaiduMapConfig.ak, BMF_COORD_TYPE.BD09LL);
+      } else if (Platform.isAndroid) {
+        BMFMapSDK.setCoordType(BMF_COORD_TYPE.BD09LL);
+      }
+
+      setState(() {
+        _isMapReady = true;
+      });
+      
+      // 添加标记点
+      _addMarkers();
+    } catch (e) {
+      debugPrint('百度地图初始化失败: $e');
+    }
+  }
+
+  void _addMarkers() {
+    if (_mapController == null) return;
+
+    _markers.clear();
+    
+    // 添加中心点标记
+    final centerMarker = BMFMarker(
+      position: BMFCoordinate(
+        widget.centerLocation.lat,
+        widget.centerLocation.lng,
+      ),
+      title: '搜索中心',
+      icon: 'assets/logo.png',
+    );
+    _markers.add(centerMarker);
+
+    // 添加搜索结果标记
+    for (int i = 0; i < widget.places.length; i++) {
+      final place = widget.places[i];
+      final marker = BMFMarker(
+        position: BMFCoordinate(
+          place.location.lat,
+          place.location.lng,
+        ),
+        title: place.name,
+        subtitle: place.address,
+        icon: 'assets/logo.png',
+      );
+      _markers.add(marker);
+    }
+
+    // 添加标记到地图
+    for (final marker in _markers) {
+      _mapController!.addMarker(marker);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('${widget.keyword} 地图'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: _isMapReady
+          ? Stack(
+              children: [
+                BMFMapWidget(
+                  onBMFMapCreated: (BMFMapController controller) {
+                    _mapController = controller;
+                    _addMarkers();
+                  },
+                  mapOptions: BMFMapOptions(
+                    center: BMFCoordinate(
+                      widget.centerLocation.lat,
+                      widget.centerLocation.lng,
+                    ),
+                    zoomLevel: 14,
+                    maxZoomLevel: 21,
+                    minZoomLevel: 4,
+                  ),
+                ),
+                // 搜索结果统计
+                Positioned(
+                  top: 16,
+                  left: 16,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '找到 ${widget.places.length} 个${widget.keyword}',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('正在加载地图...'),
+                ],
+              ),
+            ),
     );
   }
 }
@@ -950,11 +1323,13 @@ class WeatherDetailPage extends StatelessWidget {
 class SearchResultPage extends StatelessWidget {
   final String keyword;
   final List<Place> places;
+  final Location? centerLocation; // 新增参数，用于传递中心位置
 
   const SearchResultPage({
     super.key,
     required this.keyword,
     required this.places,
+    this.centerLocation,
   });
 
   @override
@@ -964,97 +1339,350 @@ class SearchResultPage extends StatelessWidget {
         title: Text('$keyword 搜索结果'),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        actions: [
+          if (centerLocation != null)
+            IconButton(
+              onPressed: () => _showMapView(context),
+              icon: const Icon(Icons.map),
+              tooltip: '在地图上查看',
+            ),
+        ],
       ),
-      body: places.isEmpty
-          ? const Center(
-              child: Text('暂无搜索结果'),
-            )
-          : ListView.builder(
+      body: Column(
+        children: [
+          // 搜索统计信息
+          if (centerLocation != null)
+            Container(
               padding: const EdgeInsets.all(16),
-              itemCount: places.length,
-              itemBuilder: (context, index) {
-                final place = places[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  child: ListTile(
-                    leading: const Icon(Icons.location_on, color: Colors.red),
-                    title: Text(place.name),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+              color: Colors.grey[100],
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '搜索中心: ${centerLocation!.lat.toStringAsFixed(4)}, ${centerLocation!.lng.toStringAsFixed(4)}',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          
+          // 搜索结果列表
+          Expanded(
+            child: places.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(place.address),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.star, size: 16, color: Colors.amber),
-                            Text(' ${place.detailInfo.overallRating}'),
-                            const SizedBox(width: 16),
-                            const Icon(Icons.directions_walk, size: 16, color: Colors.blue),
-                            Text(' ${place.detailInfo.distance}m'),
-                          ],
-                        ),
+                        Icon(Icons.search_off, size: 64, color: Colors.grey),
+                        SizedBox(height: 16),
+                        Text('暂无搜索结果', style: TextStyle(fontSize: 16, color: Colors.grey)),
                       ],
                     ),
-                    trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      _showPlaceDetails(context, place);
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: places.length,
+                    itemBuilder: (context, index) {
+                      final place = places[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        elevation: 2,
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: Colors.blue[100],
+                            child: Icon(Icons.location_on, color: Colors.blue[700]),
+                          ),
+                          title: Text(
+                            place.name,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text(
+                                place.address,
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  if (place.detailInfo.overallRating != '0')
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.star, size: 16, color: Colors.amber),
+                                        Text(' ${place.detailInfo.overallRating}'),
+                                        const SizedBox(width: 16),
+                                      ],
+                                    ),
+                                  const Icon(Icons.directions_walk, size: 16, color: Colors.blue),
+                                  Text(' ${place.detailInfo.distance}m'),
+                                  if (place.detailInfo.price.isNotEmpty) ...[
+                                    const SizedBox(width: 16),
+                                    const Icon(Icons.attach_money, size: 16, color: Colors.green),
+                                    Text(' ¥${place.detailInfo.price}'),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            _showPlaceDetails(context, place);
+                          },
+                        ),
+                      );
                     },
                   ),
-                );
-              },
-            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 在地图上查看搜索结果
+  void _showMapView(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MapSearchResultView(
+          keyword: keyword,
+          places: places,
+          centerLocation: centerLocation!,
+        ),
+      ),
     );
   }
 
   void _showPlaceDetails(BuildContext context, Place place) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.all(16),
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              place.name,
-              style: const TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
+            // 拖拽指示器
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
-            const SizedBox(height: 8),
-            Text('地址: ${place.address}'),
-            Text('评分: ${place.detailInfo.overallRating}'),
-            Text('距离: ${place.detailInfo.distance}m'),
-            if (place.detailInfo.price.isNotEmpty)
-              Text('人均: ¥${place.detailInfo.price}'),
-            if (place.detailInfo.shopHours.isNotEmpty)
-              Text('营业时间: ${place.detailInfo.shopHours}'),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    // 这里可以添加导航功能
-                  },
-                  icon: const Icon(Icons.directions),
-                  label: const Text('导航'),
+            
+            // 内容区域
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 标题和评分
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            place.name,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        if (place.detailInfo.overallRating != '0')
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.amber[100],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.star, size: 16, color: Colors.amber),
+                                const SizedBox(width: 4),
+                                Text(
+                                  place.detailInfo.overallRating,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.amber,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // 地址信息
+                    _buildInfoRow(Icons.location_on, '地址', place.address, Colors.red),
+                    
+                    // 距离信息
+                    _buildInfoRow(Icons.directions_walk, '距离', '${place.detailInfo.distance}m', Colors.blue),
+                    
+                    // 分类信息
+                    if (place.detailInfo.classifiedPoiTag.isNotEmpty)
+                      _buildInfoRow(Icons.category, '分类', place.detailInfo.classifiedPoiTag, Colors.green),
+                    
+                    // 价格信息
+                    if (place.detailInfo.price.isNotEmpty)
+                      _buildInfoRow(Icons.attach_money, '人均', '¥${place.detailInfo.price}', Colors.orange),
+                    
+                    // 营业时间
+                    if (place.detailInfo.shopHours.isNotEmpty)
+                      _buildInfoRow(Icons.access_time, '营业时间', place.detailInfo.shopHours, Colors.purple),
+                    
+                    // 评论数量
+                    if (place.detailInfo.commentNum != '0')
+                      _buildInfoRow(Icons.comment, '评论', '${place.detailInfo.commentNum}条', Colors.teal),
+                    
+                    // 标签信息
+                    if (place.detailInfo.tag.isNotEmpty)
+                      _buildInfoRow(Icons.label, '标签', place.detailInfo.tag, Colors.indigo),
+                    
+                    const SizedBox(height: 24),
+                    
+                    // 操作按钮
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _openNavigation(context, place);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blue,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            icon: const Icon(Icons.directions),
+                            label: const Text('导航'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              _sharePlace(context, place);
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                            icon: const Icon(Icons.share),
+                            label: const Text('分享'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // 查看详情按钮
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _viewPlaceDetails(context, place);
+                        },
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                        icon: const Icon(Icons.info_outline),
+                        label: const Text('查看详细信息'),
+                      ),
+                    ),
+                  ],
                 ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    // 这里可以添加分享功能
-                  },
-                  icon: const Icon(Icons.share),
-                  label: const Text('分享'),
-                ),
-              ],
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildInfoRow(IconData icon, String label, String value, Color color) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _openNavigation(BuildContext context, Place place) {
+    // 这里可以集成第三方导航应用
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('导航功能开发中...')),
+    );
+  }
+
+  void _sharePlace(BuildContext context, Place place) {
+    // 这里可以集成分享功能
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('分享功能开发中...')),
+    );
+  }
+
+  void _viewPlaceDetails(BuildContext context, Place place) {
+    // 这里可以跳转到详细页面
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('详细信息页面开发中...')),
+    );
+  }
 }
+
+// 地图搜索结果视图
