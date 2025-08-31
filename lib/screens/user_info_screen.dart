@@ -54,7 +54,7 @@ class UserInfoScreen extends StatelessWidget {
                       children: [
                         // Username
                         const Text(
-                          "用户名示例",
+                          "Amon",
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -63,7 +63,7 @@ class UserInfoScreen extends StatelessWidget {
                         const SizedBox(height: 4),
                         // User ID and IP
                         Text(
-                          "ID: user123456 | IP: 北京",
+                          "ID: 786732905 | IP: 北京",
                           style: TextStyle(
                             fontSize: 14,
                             color: Colors.grey[600],
