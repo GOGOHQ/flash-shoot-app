@@ -30,9 +30,42 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
     'likes': '1024',
   };
 
-  // Mock recent browsing history
-  final List<Map<String, String>> _recentBrowsing = List.generate(
-    5,
+  final List<Map<String, String>> _userPosts = [
+    {
+      'title': '球场和夏天也太般配啦⚾️',
+      'image': 'assets/home/3/3.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '把冰岛和你框进0.5倍的浪漫里🌈',
+      'image': 'assets/home/5/5.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '“羽”🪶你有关的心里“花”  🌸',
+      'image': 'assets/home/8/8.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '“爱人的眼睛是第八大洋”',
+      'image': 'assets/home/10/10.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+  ];
+
+
+  final List<Map<String, String>> _collectedPosts = List.generate(
+    4,
+    (i) => {
+      'title': '最近赞过 $i',
+      'image': 'https://picsum.photos/150/${150 + Random().nextInt(50)}?random=$i',
+      'avatar': 'https://i.pravatar.cc/40?img=${i + 1}',
+    },
+  );
+
+
+  final List<Map<String, String>> _likedPosts = List.generate(
+    4,
     (i) => {
       'title': '最近浏览 $i',
       'image': 'https://picsum.photos/150/${150 + Random().nextInt(50)}?random=$i',
@@ -40,31 +73,12 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
     },
   );
 
-  // Mock user posts, collected, and liked items
-  final List<Map<String, String>> _userPosts = List.generate(
-    8,
-    (i) => {
-      'title': '我的笔记 $i',
-      'image': 'https://picsum.photos/200/${200 + Random().nextInt(100)}?random=$i',
-      'avatar': 'https://i.pravatar.cc/40?img=1',
-    },
-  );
-
-  final List<Map<String, String>> _collectedPosts = List.generate(
-    6,
+  final List<Map<String, String>> _recentBrowsing = List.generate(
+    4,
     (i) => {
       'title': '收藏内容 $i',
       'image': 'https://picsum.photos/200/${200 + Random().nextInt(100)}?random=${i + 10}',
       'avatar': 'https://i.pravatar.cc/40?img=${i + 2}',
-    },
-  );
-
-  final List<Map<String, String>> _likedPosts = List.generate(
-    4,
-    (i) => {
-      'title': '点赞内容 $i',
-      'image': 'https://picsum.photos/200/${200 + Random().nextInt(100)}?random=${i + 20}',
-      'avatar': 'https://i.pravatar.cc/40?img=${i + 3}',
     },
   );
 
@@ -398,7 +412,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
         );
         break;
       default:
-        content = _userPosts;
+        content = _recentBrowsing;
         contentWidget = MasonryGridView.count(
           crossAxisCount: 2,
           mainAxisSpacing: 8,

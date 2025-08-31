@@ -125,6 +125,10 @@ flutter:
     - assets/original_picture/热门/
     - assets/original_picture/收藏/
     - assets/original_picture/情侣/
+    - assets/user/
+    - assets/user/avatar.png
+    - assets/user/back.png
+    - assets/user/消息/
     - assets/user/最近浏览/
     - assets/user/最近点赞/
     - assets/user/最近收藏/
@@ -137,3 +141,4 @@ flutter:
     - assets/poses/热门/
     - assets/poses/收藏/
     - assets/poses/情侣/
+    - assets/home/
