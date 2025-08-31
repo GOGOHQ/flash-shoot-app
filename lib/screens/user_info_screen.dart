@@ -55,13 +55,27 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
 
 
   final List<Map<String, String>> _collectedPosts = List.generate(
-    4,
-    (i) => {
-      'title': '最近赞过 $i',
-      'image': 'https://picsum.photos/150/${150 + Random().nextInt(50)}?random=$i',
-      'avatar': 'https://i.pravatar.cc/40?img=${i + 1}',
+    {
+      'title': '🍅和“秋日显眼包”一起来逛公园啦！',
+      'image': 'assets/home/3/3.jpg',
+      'avatar': 'assets/user/avatar.png',
     },
-  );
+    {
+      'title': '雪地拍照模版｜@你的姐妹去看雪🌨️',
+      'image': 'assets/home/5/5.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '闷声干大事！十七给倪倪买房了...',
+      'image': 'assets/home/8/8.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '怦然心动20岁cp现状',
+      'image': 'assets/home/10/10.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+  ];
 
 
   final List<Map<String, String>> _likedPosts = List.generate(
