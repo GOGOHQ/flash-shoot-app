@@ -28,6 +28,7 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  image_picker: ^1.1.2
   flutter:
     sdk: flutter
   camera: ^0.11.0
@@ -74,7 +75,6 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
@@ -119,5 +119,26 @@ flutter:
     - assets/poses/multi_pose/
     - assets/poses/poses.json
     - assets/original_picture/
-    - assets/original_picture/single_pose/
-    - assets/original_picture/double_pose/
+    - assets/original_picture/单人/
+    - assets/original_picture/双人/
+    - assets/original_picture/多人/
+    - assets/original_picture/热门/
+    - assets/original_picture/收藏/
+    - assets/original_picture/情侣/
+    - assets/user/
+    - assets/user/avatar.png
+    - assets/user/back.png
+    - assets/user/消息/
+    - assets/user/最近浏览/
+    - assets/user/最近点赞/
+    - assets/user/最近收藏/
+    - assets/user/
+    - assets/user/消息/
+    - assets/poses/
+    - assets/poses/单人/
+    - assets/poses/双人/
+    - assets/poses/多人/
+    - assets/poses/热门/
+    - assets/poses/收藏/
+    - assets/poses/情侣/
+    - assets/home/
