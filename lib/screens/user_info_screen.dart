@@ -54,7 +54,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
   ];
 
 
-  final List<Map<String, String>> _collectedPosts = List.generate(
+  final List<Map<String, String>> _collectedPosts = [
     {
       'title': '🍅和“秋日显眼包”一起来逛公园啦！',
       'image': 'assets/home/3/3.jpg',

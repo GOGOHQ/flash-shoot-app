@@ -48,6 +48,13 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
       'assets/original_picture/单人/6.jpg',
       'assets/original_picture/单人/7.jpg',
       'assets/original_picture/单人/8.jpg',
+      'assets/original_picture/单人/9.jpg',
+      'assets/original_picture/单人/10.jpg',
+      'assets/original_picture/单人/11.jpg',
+      'assets/original_picture/单人/12.jpg',
+      'assets/original_picture/单人/13.jpg',
+      'assets/original_picture/单人/14.jpg',
+      'assets/original_picture/单人/15.jpg',
     ],
     '双人': [
       'assets/original_picture/双人/1.jpg',
