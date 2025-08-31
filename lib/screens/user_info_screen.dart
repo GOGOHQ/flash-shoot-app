@@ -16,18 +16,18 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
 
   // Mock user data
   final Map<String, String> _userData = {
-    'username': '摄影爱好者',
-    'userId': 'XHS123456',
+    'username': 'Amon',
+    'userId': '9347129304',
     'ipLocation': '中国 · 上海',
     'bio': '热爱摄影，分享生活点滴，欢迎交流！',
     'avatar': 'https://i.pravatar.cc/100?img=1',
   };
 
   // Mock stats
-  final Map<String, int> _stats = {
-    'following': 128,
-    'followers': 345,
-    'likes': 1024,
+  final Map<String, String> _stats = {
+    'following': '128',
+    'followers': '345',
+    'likes': '1024',
   };
 
   // Mock recent browsing history
@@ -86,116 +86,103 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
   }
 
   Widget _buildUserHeader() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Avatar with shadow
-          Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: CircleAvatar(
-              radius: 48,
-              backgroundImage: NetworkImage(_userData['avatar']!),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Username
-          Text(
-            _userData['username']!,
-            style: const TextStyle(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: Colors.black,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          // User ID and IP Location
-          Text(
-            'ID: ${_userData['userId']} · ${_userData['ipLocation']}',
-            style: TextStyle(
-              fontSize: 13,
-              color: Colors.grey[600],
-              letterSpacing: 0.2,
-            ),
-          ),
-          const SizedBox(height: 10),
-          // Bio
-          Text(
-            _userData['bio']!,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.black87.withOpacity(0.9),
-              height: 1.4,
-            ),
-            textAlign: TextAlign.center,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 16),
-          // Stats
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatItem('关注', _stats['following']!),
-              const SizedBox(width: 32),
-              _buildStatItem('粉丝', _stats['followers']!),
-              const SizedBox(width: 32),
-              _buildStatItem('获赞', _stats['likes']!),
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: CircleAvatar(
+                  radius: 40,
+                  backgroundImage: NetworkImage(_userData['avatar']!),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _userData['username']!,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "ID: ${_userData['userId']} | IP: ${_userData['ipLocation']}",
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _userData['bio']!,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _buildStatColumn('关注', _stats['following']!),
+                        const SizedBox(width: 16),
+                        _buildStatColumn('粉丝', _stats['followers']!),
+                        const SizedBox(width: 16),
+                        _buildStatColumn('获赞', _stats['likes']!),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 16),
-          // Action Buttons
           Row(
-            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ElevatedButton(
-                onPressed: () {
-                  // TODO: Implement edit profile
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFED4956), // Xiaohongshu red
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    // TODO: Implement edit profile
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFED4956),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  '编辑资料',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  child: const Text('编辑资料'),
                 ),
               ),
-              const SizedBox(width: 12),
-              OutlinedButton(
-                onPressed: () {
-                  // TODO: Implement follow/unfollow
-                },
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: Colors.grey[400]!),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    // TODO: Implement follow/unfollow
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFED4956)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-                ),
-                child: Text(
-                  '关注',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
+                  child: const Text(
+                    '关注',
+                    style: TextStyle(color: Color(0xFFED4956)),
                   ),
                 ),
               ),
@@ -206,18 +193,16 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildStatItem(String label, int value) {
+  Widget _buildStatColumn(String label, String value) {
     return Column(
       children: [
         Text(
-          value.toString(),
+          value,
           style: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Colors.black,
+            fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 4),
         Text(
           label,
           style: TextStyle(
@@ -424,7 +409,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
       },
       child: SizedBox(
         key: ValueKey<int>(_selectedTabIndex),
-        height: _selectedTabIndex == 1 ? 180 : 600, // Adjust height for recent browsing
+        height: _selectedTabIndex == 1 ? 180 : 600,
         child: contentWidget,
       ),
     );
@@ -446,49 +431,47 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
         ),
         centerTitle: true,
         elevation: 0,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Column(
-            children: [
-              Container(
-                color: Colors.white,
-                child: TabBar(
-                  controller: _tabController,
-                  labelColor: const Color(0xFFED4956), // Xiaohongshu red
-                  unselectedLabelColor: Colors.grey[600],
-                  indicatorColor: const Color(0xFFED4956),
-                  indicatorWeight: 3,
-                  indicatorSize: TabBarIndicatorSize.label,
-                  labelStyle: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  tabs: _tabs
-                      .map((tab) => Tab(
-                            child: Text(tab),
-                          ))
-                      .toList(),
-                ),
-              ),
-              Container(
-                color: Colors.grey[200],
-                height: 1,
-              ),
-            ],
-          ),
-        ),
       ),
       body: CustomScrollView(
         slivers: [
           SliverToBoxAdapter(child: _buildUserHeader()),
+          SliverToBoxAdapter(
+            child: Column(
+              children: [
+                Container(
+                  color: Colors.white,
+                  child: TabBar(
+                    controller: _tabController,
+                    labelColor: const Color(0xFFED4956),
+                    unselectedLabelColor: Colors.grey[600],
+                    indicatorColor: const Color(0xFFED4956),
+                    indicatorWeight: 3,
+                    indicatorSize: TabBarIndicatorSize.label,
+                    labelStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    unselectedLabelStyle: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w400,
+                    ),
+                    tabs: _tabs
+                        .map((tab) => Tab(
+                              child: Text(tab),
+                            ))
+                        .toList(),
+                  ),
+                ),
+                Container(
+                  color: Colors.grey[200],
+                  height: 1,
+                ),
+              ],
+            ),
+          ),
           SliverToBoxAdapter(child: _buildContent()),
         ],
       ),
     );
   }
 }
-
