@@ -120,5 +120,12 @@ flutter:
     - assets/poses/multi_pose/
     - assets/poses/poses.json
     - assets/original_picture/
-    - assets/original_picture/single_pose/
-    - assets/original_picture/double_pose/
+    - assets/original_picture/单人/
+    - assets/original_picture/双人/
+    - assets/original_picture/多人/
+    - assets/original_picture/热门/
+    - assets/original_picture/收藏/
+    - assets/original_picture/情侣/
+    - assets/user/最近浏览/
+    - assets/user/最近点赞/
+    - assets/user/最近收藏/
