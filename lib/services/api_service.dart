@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/api_models.dart';
 import '../config/api_config.dart';
@@ -18,7 +19,7 @@ class ApiService {
     // 尝试主 URL
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}$endpoint').replace(queryParameters: queryParameters);
-      print('API 请求 (主): $uri');
+      debugPrint('API 请求 (主): $uri');
       
       final response = await _client.get(uri).timeout(
         const Duration(seconds: 15), // 增加超时时间到15秒
@@ -27,23 +28,23 @@ class ApiService {
         },
       );
       
-      print('API 响应状态码: ${response.statusCode}');
+      debugPrint('API 响应状态码: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        print('API 响应数据: $data');
+        debugPrint('API 响应数据: $data');
         return data;
       } else {
-        print('API 错误响应: ${response.body}');
+        debugPrint('API 错误响应: ${response.body}');
         throw Exception('HTTP ${response.statusCode}: ${response.reasonPhrase}');
       }
     } catch (e) {
-      print('主 URL 请求失败: $e');
+      debugPrint('主 URL 请求失败: $e');
       
       // 尝试备用 URL
       try {
         final backupUri = Uri.parse('${ApiConfig.backupBaseUrl}$endpoint').replace(queryParameters: queryParameters);
-        print('API 请求 (备用): $backupUri');
+        debugPrint('API 请求 (备用): $backupUri');
         
         final response = await _client.get(backupUri).timeout(
           const Duration(seconds: 15),
@@ -52,18 +53,18 @@ class ApiService {
           },
         );
         
-        print('备用 API 响应状态码: ${response.statusCode}');
+        debugPrint('备用 API 响应状态码: ${response.statusCode}');
         
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
-          print('备用 API 响应数据: $data');
+          debugPrint('备用 API 响应数据: $data');
           return data;
         } else {
-          print('备用 API 错误响应: ${response.body}');
+          debugPrint('备用 API 错误响应: ${response.body}');
           throw Exception('备用 HTTP ${response.statusCode}: ${response.reasonPhrase}');
         }
       } catch (backupError) {
-        print('备用 URL 请求也失败: $backupError');
+        debugPrint('备用 URL 请求也失败: $backupError');
         throw Exception('网络请求失败: $e (备用: $backupError)');
       }
     }
@@ -81,14 +82,24 @@ class ApiService {
     String? q,
     bool? skipLogin,
   }) async {
+    debugPrint('=== 小红书API调用开始 ===');
+    debugPrint('参数: limit=$limit, q=$q, skipLogin=$skipLogin');
+    
     final queryParams = <String, String>{};
     
     if (limit != null) queryParams['limit'] = limit.toString();
     if (q != null) queryParams['q'] = q;
     if (skipLogin != null) queryParams['skip_login'] = skipLogin.toString();
 
+    debugPrint('查询参数: $queryParams');
     final response = await _get('/api/xhs/hot', queryParameters: queryParams);
-    return XhsHotResponse.fromJson(response);
+    debugPrint('小红书API原始响应: $response');
+    
+    final result = XhsHotResponse.fromJson(response);
+    debugPrint('小红书API解析结果: ${result.data.length} 条数据');
+    debugPrint('=== 小红书API调用完成 ===');
+    
+    return result;
   }
 
   /// 搜索帖子链接
@@ -175,7 +186,24 @@ class ApiService {
     if (radius != null) queryParams['radius'] = radius.toString();
 
     final response = await _get('/api/baidu-maps/search-places', queryParameters: queryParams);
-    return SearchPlacesResponse.fromJson(response);
+    debugPrint('搜索地点 API 原始响应: $response');
+    
+    // API 返回的是 {data: [地点数组]}，我们需要构造正确的格式
+    final placesList = response['data'] as List? ?? [];
+    debugPrint('搜索地点 API 地点数组: $placesList');
+    
+    // 构造 SearchPlacesResponse 期望的格式
+    final formattedResponse = {
+      'status': 0,
+      'message': 'success',
+      'result_type': 'place',
+      'query_type': 'search',
+      'results': placesList,
+    };
+    
+    debugPrint('搜索地点 API 格式化后数据: $formattedResponse');
+    
+    return SearchPlacesResponse.fromJson(formattedResponse);
   }
 
   /// 天气查询
@@ -188,7 +216,9 @@ class ApiService {
       'location': location,
     };
 
+    debugPrint('天气查询 API 请求参数: $queryParams');
     final response = await _get('/api/baidu-maps/weather', queryParameters: queryParams);
+    debugPrint('天气查询 API 原始响应: $response');
     return WeatherResponse.fromJson(response);
   }
 
@@ -213,7 +243,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      print('获取地址坐标失败: $e');
+      debugPrint('获取地址坐标失败: $e');
       return null;
     }
   }
@@ -227,7 +257,7 @@ class ApiService {
       }
       return null;
     } catch (e) {
-      print('获取坐标地址失败: $e');
+      debugPrint('获取坐标地址失败: $e');
       return null;
     }
   }
@@ -250,7 +280,7 @@ class ApiService {
       );
       return response.results;
     } catch (e) {
-      print('搜索附近美食失败: $e');
+      debugPrint('搜索附近美食失败: $e');
       return [];
     }
   }
@@ -273,7 +303,7 @@ class ApiService {
       );
       return response.results;
     } catch (e) {
-      print('搜索附近景点失败: $e');
+      debugPrint('搜索附近景点失败: $e');
       return [];
     }
   }

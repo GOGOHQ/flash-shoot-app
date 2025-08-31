@@ -25,14 +25,19 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   Future<void> _initCamera() async {
-    _cameras = await availableCameras();
-    if (_cameras!.isNotEmpty) {
-      _cameraController = CameraController(
-        _cameras![0],
-        ResolutionPreset.high,
-      );
-      await _cameraController!.initialize();
-      if (mounted) setState(() {});
+    try {
+      _cameras = await availableCameras();
+      if (_cameras!.isNotEmpty) {
+        _cameraController = CameraController(
+          _cameras![0],
+          ResolutionPreset.high,
+          enableAudio: false,
+        );
+        await _cameraController!.initialize();
+        if (mounted) setState(() {});
+      }
+    } catch (e) {
+      debugPrint("初始化相机失败: $e");
     }
   }
 
