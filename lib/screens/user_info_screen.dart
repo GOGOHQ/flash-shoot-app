@@ -20,7 +20,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
     'userId': '9347129304',
     'ipLocation': '中国 · 上海',
     'bio': '热爱摄影，分享生活点滴，欢迎交流！',
-    'avatar': 'https://i.pravatar.cc/100?img=1',
+    'avatar': 'assets/user/avatar.png',
   };
 
   // Mock stats
@@ -86,7 +86,14 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
   }
 
   Widget _buildUserHeader() {
-    return Padding(
+    return Container(
+      decoration: BoxDecoration(
+        image: DecorationImage(
+          image: AssetImage('assets/user/back.png'),
+          fit: BoxFit.cover,
+          colorFilter: ColorFilter.mode(Colors.black.withOpacity(0.3), BlendMode.darken),
+        ),
+      ),
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -120,6 +127,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
                       style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -127,13 +135,13 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
                       "ID: ${_userData['userId']} | IP: ${_userData['ipLocation']}",
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: Colors.grey[200],
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       _userData['bio']!,
-                      style: const TextStyle(fontSize: 14),
+                      style: const TextStyle(fontSize: 14, color: Colors.white),
                     ),
                     const SizedBox(height: 12),
                     Row(
@@ -175,14 +183,14 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
                     // TODO: Implement follow/unfollow
                   },
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFED4956)),
+                    side: const BorderSide(color: Colors.white),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
                   ),
                   child: const Text(
-                    '关注',
-                    style: TextStyle(color: Color(0xFFED4956)),
+                    '本地草稿',
+                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
               ),
@@ -201,13 +209,14 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
+            color: Colors.white,
           ),
         ),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.grey[600],
+            color: Colors.grey[200],
           ),
         ),
       ],
@@ -436,11 +445,14 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
         slivers: [
           SliverToBoxAdapter(child: _buildUserHeader()),
           SliverToBoxAdapter(
-            child: Column(
-              children: [
-                Container(
-                  color: Colors.white,
-                  child: TabBar(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                children: [
+                  TabBar(
                     controller: _tabController,
                     labelColor: const Color(0xFFED4956),
                     unselectedLabelColor: Colors.grey[600],
@@ -461,12 +473,12 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
                             ))
                         .toList(),
                   ),
-                ),
-                Container(
-                  color: Colors.grey[200],
-                  height: 1,
-                ),
-              ],
+                  Container(
+                    color: Colors.grey[200],
+                    height: 1,
+                  ),
+                ],
+              ),
             ),
           ),
           SliverToBoxAdapter(child: _buildContent()),
