@@ -77,9 +77,9 @@ class _MapScreenState extends State<MapScreen> {
         _isMapReady = true;
       });
       
-      // 获取定位权限并开始定位
+      // 获取定位权限并设置默认位置（不显示气泡）
       await _requestLocationPermission();
-      await _startLocation();
+      await _setDefaultLocation();
     } catch (e) {
       debugPrint('百度地图初始化失败: $e');
     }
@@ -93,6 +93,33 @@ class _MapScreenState extends State<MapScreen> {
       if (status != PermissionStatus.granted) {
         debugPrint('定位权限被拒绝');
       }
+    }
+  }
+
+  // 设置默认位置（不显示气泡）
+  Future<void> _setDefaultLocation() async {
+    debugPrint('=== 设置默认位置 ===');
+    if (_locationPlugin == null) {
+      debugPrint('定位插件未初始化');
+      return;
+    }
+
+    try {
+      debugPrint('设置默认位置: ${BaiduMapConfig.defaultLatitude}, ${BaiduMapConfig.defaultLongitude}');
+      // 使用默认位置（北京天安门）
+      setState(() {
+        _currentLocation = BMFCoordinate(
+          BaiduMapConfig.defaultLatitude,
+          BaiduMapConfig.defaultLongitude,
+        );
+      });
+      
+      // 更新地图到当前位置
+      _updateMapToCurrentLocation();
+      
+      debugPrint('=== 默认位置设置完成 ===');
+    } catch (e) {
+      debugPrint('设置默认位置失败: $e');
     }
   }
 

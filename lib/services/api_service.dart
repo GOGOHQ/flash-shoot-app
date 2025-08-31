@@ -80,16 +80,13 @@ class ApiService {
   Future<XhsHotResponse> getXhsHot({
     int? limit,
     String? q,
-    bool? skipLogin,
   }) async {
     debugPrint('=== 小红书API调用开始 ===');
-    debugPrint('参数: limit=$limit, q=$q, skipLogin=$skipLogin');
     
     final queryParams = <String, String>{};
     
     if (limit != null) queryParams['limit'] = limit.toString();
     if (q != null) queryParams['q'] = q;
-    if (skipLogin != null) queryParams['skip_login'] = skipLogin.toString();
 
     debugPrint('查询参数: $queryParams');
     final response = await _get('/api/xhs/hot', queryParameters: queryParams);
