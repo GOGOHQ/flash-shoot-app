@@ -279,6 +279,20 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
   }
 
   Widget _buildRecentBrowsingTab() {
+    return MasonryGridView.count(
+      crossAxisCount: 2, // 2列布局，和笔记/收藏/点赞一致
+      mainAxisSpacing: 8, // 纵向间距，与其他标签页统一
+      crossAxisSpacing: 8, // 横向间距，与其他标签页统一
+      padding: const EdgeInsets.all(8), // 内边距，与其他标签页统一
+      itemCount: _recentBrowsing.length, // 数据长度（最近浏览列表）
+      itemBuilder: (context, index) {
+        final item = _recentBrowsing[index];
+        return _buildCard(item); // 直接复用已有的卡片组件，确保样式完全一致
+      },
+    );
+  }
+
+  Widget _buildRecentBrowsingTab1() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       child: ListView.builder(
