@@ -34,21 +34,21 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
     {
       'title': '球场和夏天也太般配啦⚾️',
       'image': 'assets/home/3/3.jpg',
-      'avatar': 'assets/user/avatar.png',
+      'avatar': 'assets/original_picture/情侣/6.jpg',
     },
     {
       'title': '把冰岛和你框进0.5倍的浪漫里🌈',
-      'image': 'assets/home/5/5.jpg',
+      'image': 'assets/original_picture/多人/21.jpg',
       'avatar': 'assets/user/avatar.png',
     },
     {
       'title': '“羽”🪶你有关的心里“花”  🌸',
-      'image': 'assets/home/8/8.jpg',
+      'image': 'assets/original_picture/多人/22.jpg',
       'avatar': 'assets/user/avatar.png',
     },
     {
       'title': '“爱人的眼睛是第八大洋”',
-      'image': 'assets/home/10/10.jpg',
+      'image': 'assets/original_picture/多人/11.jpg',
       'avatar': 'assets/user/avatar.png',
     },
   ];
@@ -57,7 +57,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
   final List<Map<String, String>> _collectedPosts = [
     {
       'title': '🍅和“秋日显眼包”一起来逛公园啦！',
-      'image': 'assets/home/3/3.jpg',
+      'image': 'assets/home/4/4.jpg',
       'avatar': 'assets/user/avatar.png',
     },
     {
@@ -67,7 +67,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
     },
     {
       'title': '闷声干大事！十七给倪倪买房了...',
-      'image': 'assets/home/8/8.jpg',
+      'image': 'assets/original_picture/多人/5.jpg',
       'avatar': 'assets/user/avatar.png',
     },
     {
@@ -77,24 +77,51 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
     },
   ];
 
-
-  final List<Map<String, String>> _likedPosts = List.generate(
-    4,
-    (i) => {
-      'title': '最近浏览 $i',
-      'image': 'https://picsum.photos/150/${150 + Random().nextInt(50)}?random=$i',
-      'avatar': 'https://i.pravatar.cc/40?img=${i + 1}',
+  final List<Map<String, String>> _likedPosts = [
+    {
+      'title': '🍅和“秋日显眼包”一起来逛公园啦！',
+      'image': 'assets/original_picture/情侣/24.jpg',
+      'avatar': 'assets/user/avatar.png',
     },
-  );
-
-  final List<Map<String, String>> _recentBrowsing = List.generate(
-    4,
-    (i) => {
-      'title': '收藏内容 $i',
-      'image': 'https://picsum.photos/200/${200 + Random().nextInt(100)}?random=${i + 10}',
-      'avatar': 'https://i.pravatar.cc/40?img=${i + 2}',
+    {
+      'title': '雪地拍照模版｜@你的姐妹去看雪🌨️',
+      'image': 'assets/home/8/8.jpg',
+      'avatar': 'assets/user/avatar.png',
     },
-  );
+    {
+      'title': '闷声干大事！十七给倪倪买房了...',
+      'image': 'assets/original_picture/单人/5.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '怦然心动20岁cp现状',
+      'image': 'assets/original_picture/情侣/8.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+  ];
+
+  final List<Map<String, String>> _recentBrowsing = [
+    {
+      'title': '🍅和“秋日显眼包”一起来逛公园啦！',
+      'image': 'assets/home/10/10.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '雪地拍照模版｜@你的姐妹去看雪🌨️',
+      'image': 'assets/original_picture/双人/18.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '闷声干大事！十七给倪倪买房了...',
+      'image': 'assets/original_picture/双人/5.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+    {
+      'title': '怦然心动20岁cp现状',
+      'image': 'assets/original_picture/收藏/5.jpg',
+      'avatar': 'assets/user/avatar.png',
+    },
+  ];
 
   @override
   void initState() {
@@ -272,7 +299,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Image.network(
+                  Image.asset(
                     item['image']!,
                     fit: BoxFit.cover,
                     height: 100,
@@ -297,7 +324,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
                       children: [
                         CircleAvatar(
                           radius: 10,
-                          backgroundImage: NetworkImage(item['avatar']!),
+                          backgroundImage: AssetImage(item['avatar']!),
                         ),
                         const SizedBox(width: 6),
                         Expanded(
