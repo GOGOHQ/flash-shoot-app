@@ -174,7 +174,7 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
               crossAxisCount: 2, // Two columns
               crossAxisSpacing: 8,
               mainAxisSpacing: 8,
-              childAspectRatio: 1, // Square aspect ratio
+              childAspectRatio: 3 / 4, // Square aspect ratio
             ),
             itemBuilder: (context, index) {
               if (index == categoryImages.length && isLoadingMore) {
