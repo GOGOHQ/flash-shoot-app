@@ -57,12 +57,17 @@ class _RecommendationBubbleState extends State<RecommendationBubble> {
       final locationKeywords = _getLocationKeywords();
       debugPrint('生成的位置关键词: $locationKeywords');
       
+      // 注释掉真实API调用，直接使用模拟数据
+      debugPrint('跳过小红书API调用，直接使用模拟数据');
+      _loadMockData();
+      
+      // 以下是原来的API调用代码（已注释）
+      /*
       debugPrint('正在调用小红书API...');
       try {
         final response = await _apiService.getXhsHot(
           limit: 6,
           q: locationKeywords,
-          skipLogin: true,
         );
         
         debugPrint('小红书API响应: ${response.data.length} 条数据');
@@ -77,6 +82,7 @@ class _RecommendationBubbleState extends State<RecommendationBubble> {
         // 使用模拟数据
         _loadMockData();
       }
+      */
       
       debugPrint('=== 推荐内容加载完成 ===');
     } catch (e) {
@@ -114,51 +120,51 @@ class _RecommendationBubbleState extends State<RecommendationBubble> {
     final mockPosts = [
       XhsPost(
         id: '1',
-        title: '北京必打卡的网红咖啡店，拍照超好看！',
-        author: '咖啡达人小王',
-        likes: 1234,
-        excerpt: '今天给大家推荐一家超级适合拍照的咖啡店，环境超美，咖啡也很好喝...',
-        postUrl: 'https://www.xiaohongshu.com/mock/1',
+        title: '北京7-9月景点红黑榜📍建议去🆚不要去',
+        author: '橙大可爱',
+        likes: 1200,
+        excerpt: '给大家整理了北京zui新的旅游攻略，包含必去景点和避坑指南',
+        postUrl: 'https://www.xiaohongshu.com/search_result/6880820c000000000b01d9ed?xsec_token=AB7oNcvMPFF4z3X5Kd4UFEL0n4O0suVGEEEgKFVWcU2vE=&xsec_source=',
       ),
       XhsPost(
         id: '2',
-        title: '北京胡同里的隐藏美食，本地人才知道',
-        author: '美食探索者',
+        title: '清明去北京玩👀就按这份旅行地图来🗺️',
+        author: '游学郑老师',
         likes: 856,
-        excerpt: '在胡同深处发现了一家超级好吃的面馆，老板做了30年，味道绝了...',
-        postUrl: 'https://www.xiaohongshu.com/mock/2',
+        excerpt: '详细的北京旅行地图，包含景点路线和美食推荐',
+        postUrl: 'https://www.xiaohongshu.com/search_result/67e4bbb0000000000603c3ab?xsec_token=ABLAQ0SyTx9jOt8uyL1YawAhK7LtkXXyd-_FKznEAdRmo=&xsec_source=',
       ),
       XhsPost(
         id: '3',
-        title: '北京周末好去处，文艺青年必去',
-        author: '文艺小青年',
+        title: '🌸北京周末去哪儿指南｜亲测20+好去处',
+        author: '有时出逃',
         likes: 567,
-        excerpt: '发现了一个超级文艺的地方，适合周末放松，拍照也很出片...',
-        postUrl: 'https://www.xiaohongshu.com/mock/3',
+        excerpt: '北京周末去哪儿指南，亲测20+好去处推荐',
+        postUrl: 'https://www.xiaohongshu.com/search_result/68821af8000000002400c163?xsec_token=ABZsg4xlCi4PrWc1g6BXt5yLig1-P-agPZ-uVDGuwa0-k=&xsec_source=',
       ),
       XhsPost(
         id: '4',
-        title: '北京最新网红打卡地，人少景美',
-        author: '旅行摄影师',
+        title: '8-9月北京5天4晚旅游攻略🔥附路线',
+        author: '小晶同学',
         likes: 432,
-        excerpt: '最近发现了一个新的打卡地，人不多但景色超美，强烈推荐...',
-        postUrl: 'https://www.xiaohongshu.com/mock/4',
+        excerpt: '详细的北京5天4晚旅游攻略，包含完整路线规划',
+        postUrl: 'https://www.xiaohongshu.com/search_result/688895130000000023038c52?xsec_token=AB4Xx4CSoQ79geMVnQn9NPw3NwTZbqcD775tAxKVcXYFc=&xsec_source=',
       ),
       XhsPost(
         id: '5',
-        title: '北京必吃美食清单，本地人推荐',
-        author: '北京土著',
+        title: '北京9个情侣约会基地',
+        author: '约会达人',
         likes: 789,
-        excerpt: '作为北京土著，给大家推荐一些真正好吃的本地美食...',
-        postUrl: 'https://www.xiaohongshu.com/mock/5',
+        excerpt: '北京最适合情侣约会的9个地方，浪漫指数满分',
+        postUrl: 'https://www.xiaohongshu.com/search_result/67b841030000000029035b00?xsec_token=AB1IjFeP01x8z8-r9lTLfux8oLNnGAku7SLJqTtMYQGpc=&xsec_source=',
       ),
       XhsPost(
         id: '6',
-        title: '北京夜景最佳观赏点，情侣必去',
-        author: '夜景爱好者',
+        title: '北京周末去哪儿（地区版）',
+        author: '本地向导',
         likes: 654,
-        excerpt: '北京最美的夜景观赏点，特别适合情侣约会，浪漫指数满分...',
-        postUrl: 'https://www.xiaohongshu.com/mock/6',
+        excerpt: '按地区划分的北京周末游玩指南，方便就近选择',
+        postUrl: 'https://www.xiaohongshu.com/search_result/67e51d54000000001c002d3a?xsec_token=ABf9fp05bLAxvyYuMnvTniow7Dbr8_RV699JQXc7AprXs=&xsec_source=',
       ),
     ];
 
