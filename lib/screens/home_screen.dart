@@ -181,7 +181,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         title: "又一张自定义照片",
         username: "新的用户",
         avatarUrl: "https://example.com/avatars/new_user.jpg",
-        imageUrl: "https://example.com/images/new_photo.jpg",
+imageUrl: "https://example.com/images/new_photo.jpg",
       ),
       // Add more new items here
     ];
@@ -202,19 +202,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         title: "我的第一张自定义照片",
         username: "摄影小能手",
         avatarUrl: "https://example.com/avatars/user1.jpg",
-        imageUrl: "https://example.com/images/photo1.jpg",
-      ),
-      _RecommendationItem(
-        title: "美丽的日落",
+imageUrl: "https://example.com/images/photo1.jpg",
+),
+_RecommendationItem(
+title: "美丽的日落",
         username: "旅行达人",
         avatarUrl: "https://example.com/avatars/user2.jpg",
-        imageUrl: "https://example.com/images/photo2.jpg",
-      ),
-      _RecommendationItem(
-        title: "城市夜景",
+imageUrl: "https://example.com/images/photo2.jpg",
+),
+_RecommendationItem(
+title: "城市夜景",
         username: "夜拍爱好者",
         avatarUrl: "https://example.com/avatars/user3.jpg",
-        imageUrl: "https://example.com/images/photo3.jpg",
+imageUrl: "https://example.com/images/photo3.jpg",
       ),
     ]);
     setState(() {});
@@ -280,7 +280,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Image.network(
+          Image.asset(
             item.imageUrl,
             fit: BoxFit.cover,
             width: double.infinity,
@@ -306,7 +306,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               children: [
                 CircleAvatar(
                   radius: 12,
-                  backgroundImage: NetworkImage(item.avatarUrl),
+                  backgroundImage: AssetImage(item.avatarUrl),
                   onBackgroundImageError: (exception, stackTrace) =>
                       const Icon(Icons.person),
                 ),
