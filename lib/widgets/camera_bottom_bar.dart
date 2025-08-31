@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import '../config/app_routes.dart';
+import '../screens/pose_library_screen.dart';
 
 class CameraBottomBar extends StatelessWidget {
   final VoidCallback? onTakePicture;
   final VoidCallback? onSwitchCamera;
+  final void Function(String)? onSelectPose; // 新增
+
 
   const CameraBottomBar({
     super.key,
     this.onTakePicture,
     this.onSwitchCamera,
+    this.onSelectPose,
   });
 
   @override
@@ -41,7 +45,16 @@ class CameraBottomBar extends StatelessWidget {
                   /// 姿势库预览入口
                   GestureDetector(
                     onTap: () {
-                      Navigator.pushNamed(context, AppRoutes.poseLibrary);
+                      if (onSelectPose != null) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PoseLibraryScreen(onSelectPose: onSelectPose),
+                            ),
+                          );
+                        } else {
+                          Navigator.pushNamed(context, AppRoutes.poseLibrary);
+                        }
                     },
                     child: Container(
                       width: 48,
@@ -74,8 +87,8 @@ class CameraBottomBar extends StatelessWidget {
               ),
               child: Center(
                 child: Container(
-                  width: 50,
-                  height: 50,
+                  width: 56,
+                  height: 56,
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Colors.white,

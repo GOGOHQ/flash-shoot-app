@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'camera_screen.dart';
+import '../config/app_routes.dart';
 
 class PoseLibraryScreen extends StatefulWidget {
-  const PoseLibraryScreen({super.key});
+  final void Function(String)? onSelectPose; // ✅ 回调函数
+
+  const PoseLibraryScreen({super.key, this.onSelectPose});
 
   @override
   State<PoseLibraryScreen> createState() => _PoseLibraryScreenState();
@@ -144,65 +148,74 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
   }
 
   Widget buildGridForCategory(String category) {
-    final categoryImages = images[category] ?? [];
-    bool isLoadingMore = false;
-
-    return StatefulBuilder(
-      builder: (context, setState) {
-        return NotificationListener<ScrollNotification>(
-          onNotification: (scrollInfo) {
-            if (scrollInfo is ScrollUpdateNotification &&
-                scrollInfo.metrics.pixels >=
-                    scrollInfo.metrics.maxScrollExtent * 0.8 &&
-                !isLoadingMore) {
-              setState(() {
-                isLoadingMore = true;
-              });
-              // Simulate preloading (replace with actual data fetch if needed)
-              Future.delayed(const Duration(seconds: 2), () {
+      final categoryImages = images[category] ?? [];
+      bool isLoadingMore = false;
+        // 从 arguments 获取回调函数
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return NotificationListener<ScrollNotification>(
+            onNotification: (scrollInfo) {
+              if (scrollInfo is ScrollUpdateNotification &&
+                  scrollInfo.metrics.pixels >=
+                      scrollInfo.metrics.maxScrollExtent * 0.8 &&
+                  !isLoadingMore) {
                 setState(() {
-                  isLoadingMore = false;
+                  isLoadingMore = true;
                 });
-              });
-            }
-            return false;
-          },
-          child: GridView.builder(
-            padding: const EdgeInsets.all(8),
-            itemCount: categoryImages.length + (isLoadingMore ? 1 : 0),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2, // Two columns
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-              childAspectRatio: 3 / 4, // Square aspect ratio
-            ),
-            itemBuilder: (context, index) {
-              if (index == categoryImages.length && isLoadingMore) {
-                return const Center(
-                  child: CircularProgressIndicator(),
-                );
+                // 模拟预加载（可替换为实际数据加载）
+                Future.delayed(const Duration(seconds: 2), () {
+                  setState(() {
+                    isLoadingMore = false;
+                  });
+                });
               }
-              final imagePath = categoryImages[index];
-              return ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: FadeInImage(
-                  placeholder: const AssetImage('assets/placeholder.png'), // Add a placeholder image in assets
-                  image: AssetImage(imagePath),
-                  fit: BoxFit.cover,
-                  imageErrorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Icon(Icons.error, color: Colors.red),
-                    );
-                  },
-                ),
-              );
+              return false;
             },
-          ),
-        );
-      },
-    );
-  }
+            child: GridView.builder(
+              padding: const EdgeInsets.all(8),
+              itemCount: categoryImages.length + (isLoadingMore ? 1 : 0),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2, // 两列
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 3 / 4, // 正方形
+              ),
+              itemBuilder: (context, index) {
+                if (index == categoryImages.length && isLoadingMore) {
+                  return const Center(
+                    child: CircularProgressIndicator(),
+                  );
+                }
+                final imagePath = categoryImages[index];
 
+                // ⚡ 点击跳转到 CameraScreen 并传递叠加图片
+                return GestureDetector(
+                  onTap: () {
+                    if (widget.onSelectPose != null) {
+                      widget.onSelectPose!(imagePath); // 调用回调更新 overlay
+                    }
+                    Navigator.pop(context); // 返回 CameraScreen
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: FadeInImage(
+                      placeholder: const AssetImage('assets/placeholder.png'),
+                      image: AssetImage(imagePath),
+                      fit: BoxFit.cover,
+                      imageErrorBuilder: (context, error, stackTrace) {
+                        return const Center(
+                          child: Icon(Icons.error, color: Colors.red),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      );
+    }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
