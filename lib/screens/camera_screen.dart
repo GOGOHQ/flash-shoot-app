@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:photo_manager/photo_manager.dart';
+
 import '../widgets/camera_top_bar.dart';
 import '../widgets/camera_preview_area.dart';
 import '../widgets/camera_bottom_bar.dart';
@@ -15,6 +17,7 @@ class CameraScreen extends StatefulWidget {
 class _CameraScreenState extends State<CameraScreen> {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
+  List<double> _zoomLevels = [];
   bool _isFlashOn = false;
   GridType _gridType = GridType.none;
 
@@ -34,7 +37,22 @@ class _CameraScreenState extends State<CameraScreen> {
           enableAudio: false,
         );
         await _cameraController!.initialize();
-        if (mounted) setState(() {});
+
+        // 读取相机支持的倍率范围
+        final minZoom = await _cameraController!.getMinZoomLevel();
+        final maxZoom = await _cameraController!.getMaxZoomLevel();
+
+        // 自动生成倍率列表（例如 1x, 2x, 3x ... 到最大值）
+        final List<double> zoomLevels = [];
+        for (double z = minZoom; z <= maxZoom; z += 1.0) {
+          zoomLevels.add(double.parse(z.toStringAsFixed(1)));
+        }
+
+        if (mounted) {
+          setState(() {
+            _zoomLevels = zoomLevels;
+          });
+        }
       }
     } catch (e) {
       debugPrint("初始化相机失败: $e");
@@ -73,14 +91,34 @@ class _CameraScreenState extends State<CameraScreen> {
     });
   }
 
-  Future<void> _takePicture() async {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+Future<void> _takePicture() async {
+  if (_cameraController == null || !_cameraController!.value.isInitialized) {
+    return;
+  }
+
+  try {
+    // 拍照
+    final XFile file = await _cameraController!.takePicture();
+    debugPrint("拍摄完成: ${file.path}");
+
+    // 请求相册权限
+    final permitted = await PhotoManager.requestPermissionExtend();
+    if (!permitted.isAuth) {
+      debugPrint("相册权限未授权，无法保存照片");
       return;
     }
-    final file = await _cameraController!.takePicture();
-    debugPrint("拍摄完成: ${file.path}");
-    // TODO: 保存或跳转到预览页
+
+    // 保存到相册
+    final result = await PhotoManager.editor.saveImageWithPath(file.path);
+    if (result != null) {
+      debugPrint("照片已保存到系统相册: $result");
+    } else {
+      debugPrint("照片保存失败");
+    }
+  } catch (e) {
+    debugPrint("拍照或保存失败: $e");
   }
+}
 
   Future<void> _switchCamera() async {
     if (_cameras == null || _cameras!.length < 2) return;
@@ -122,8 +160,10 @@ class _CameraScreenState extends State<CameraScreen> {
               child: CameraPreviewArea(
                 controller: _cameraController,
                 gridType: _gridType,
+                zoomLevels: _zoomLevels,
               ),
             ),
+
 
             /// 底部栏
             CameraBottomBar(
