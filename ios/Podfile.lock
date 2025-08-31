@@ -95,19 +95,19 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   BaiduMapKit: 84991811cb07b24c6ead7d59022c13245427782c
   BMKLocationKit: 79689c9898474cbad4a93a5f0cc06c8c97fa2b02
-  camera_avfoundation: be3be85408cd4126f250386828e9b1dfa40ab436
+  camera_avfoundation: adb0207d868b2d873e895371d88448399ab78d87
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  flutter_baidu_mapapi_base: 24dd82034374c6f52a73e90316834c63ff8d4f64
-  flutter_baidu_mapapi_map: f799cc1bb3d39196b8d3d59399ca8635e690bd44
-  flutter_baidu_mapapi_search: 290fb2391e21deaa14234647dbbb159e4d428111
-  flutter_baidu_mapapi_utils: 0c69394243d51e97f521f396e150aaaf31e84e29
-  flutter_bmflocation: d298232cee10f83d81138f28365be34c7e263cb2
-  gallery_saver: 1d68d1818df11b1afa84a97d1a530463753e92e3
-  path_provider_foundation: 080d55be775b7414fd5a5ef3ac137b97b097e564
-  permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
-  photo_manager: 1d80ae07a89a67dfbcae95953a1e5a24af7c3e62
-  sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
-  url_launcher_ios: 694010445543906933d732453a59da0a173ae33d
+  flutter_baidu_mapapi_base: b64ee8ed2c189b06ac50c96df1b4d0d6e58b8690
+  flutter_baidu_mapapi_map: 2f85b973826c694abfc3a3f9d89fb1ebe0d6d0a3
+  flutter_baidu_mapapi_search: abab85fc0cb8e3c98579906a9dfddf8dac626486
+  flutter_baidu_mapapi_utils: 1ebd9cc01610c08d7c55a05c16e8e9d74a862e36
+  flutter_bmflocation: f53a4bad68d0f0078dae79e92a1a9fd9b22e8487
+  gallery_saver: 9fc173c9f4fcc48af53b2a9ebea1b643255be542
+  path_provider_foundation: 2b6b4c569c0fb62ec74538f866245ac84301af46
+  permission_handler_apple: 9878588469a2b0d0fc1e048d9f43605f92e6cec2
+  photo_manager: 81954a1bf804b6e882d0453b3b6bc7fad7b47d3d
+  sqflite_darwin: 5a7236e3b501866c1c9befc6771dfd73ffb8702d
+  url_launcher_ios: 5334b05cef931de560670eeae103fd3e431ac3fe
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 
