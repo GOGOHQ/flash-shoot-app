@@ -23,22 +23,12 @@ class _CameraScreenState extends State<CameraScreen> {
   bool _isFlashOn = false;
   GridType _gridType = GridType.none;
   String? _overlayImagePath; // ✅ 在这里定义
+  String? _overlayPosePath; // ✅ 在这里定义
 
   @override
   void initState() {
     super.initState();
     _initCamera();
-  }
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final args = ModalRoute.of(context)?.settings.arguments as Map?;
-    if (args != null && args['overlayImagePath'] != null) {
-      setState(() {
-        // 将参数传给 CameraPreviewArea
-        _overlayImagePath = args['overlayImagePath'];
-      });
-    }
   }
 
   Future<void> _initCamera() async {
@@ -164,21 +154,6 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
  
-  void _openPoseLibrary() {
-    Navigator.pushNamed(
-      context,
-      AppRoutes.poseLibrary,
-      arguments: (String imagePath) {
-        // 回调函数：更新 overlay 图片
-        setState(() {
-          _overlayImagePath = imagePath;
-          print('Overlay image path updated: $imagePath');
-        });
-      },
-    );
-  }
-
-
   @override
   void dispose() {
     _cameraController?.dispose();
@@ -200,12 +175,56 @@ class _CameraScreenState extends State<CameraScreen> {
             ),
 
             /// 相机预览区
+            /// 相机预览区 + 浮动窗口
             Expanded(
-              child: CameraPreviewArea(
-                controller: _cameraController,
-                gridType: _gridType,
-                zoomLevels: _zoomLevels,
-                overlayImagePath: _overlayImagePath, // 新增
+              child: Stack(
+                children: [
+                  /// 相机预览
+                  CameraPreviewArea(
+                    controller: _cameraController,
+                    gridType: _gridType,
+                    zoomLevels: _zoomLevels,
+                    overlayPosePath: _overlayPosePath, // ✅ 姿势叠加
+                  ),
+
+                  /// 浮动小窗口（左下角缩略图）
+                  if (_overlayImagePath != null)
+                    Positioned(
+                      left: 16,
+                      bottom: 16,
+                      child: GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (_) => Dialog(
+                              child: Image.asset(
+                                _overlayImagePath!,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          constraints: const BoxConstraints(
+                            maxWidth: 150, // 限制最大宽
+                            maxHeight: 150, // 限制最大高
+                          ),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.white, width: 2),
+                            borderRadius: BorderRadius.circular(8),
+                            color: Colors.black54,
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Image.asset(
+                              _overlayImagePath!,
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
 
@@ -214,9 +233,12 @@ class _CameraScreenState extends State<CameraScreen> {
             CameraBottomBar(
               onTakePicture: _takePicture,
               onSwitchCamera: _switchCamera,
-              onSelectPose: (imagePath) {
+              onSelectPose: ({required String imagePath, required String posePath}) {
                 setState(() {
                   _overlayImagePath = imagePath;
+                  _overlayPosePath = posePath;
+                  print("Overlay Image Path: $imagePath");
+                  print("Overlay Pose Path: $posePath");
                 });
               },
             ),

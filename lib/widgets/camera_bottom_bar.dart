@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:photo_manager/photo_manager.dart';
 import '../config/app_routes.dart';
 import '../screens/pose_library_screen.dart';
+import 'dart:typed_data';
 
-class CameraBottomBar extends StatelessWidget {
+class CameraBottomBar extends StatefulWidget {
   final VoidCallback? onTakePicture;
   final VoidCallback? onSwitchCamera;
-  final void Function(String)? onSelectPose; // 新增
-
+  final void Function({
+    required String imagePath,
+    required String posePath,
+  })? onSelectPose;
 
   const CameraBottomBar({
     super.key,
@@ -16,6 +20,45 @@ class CameraBottomBar extends StatelessWidget {
   });
 
   @override
+  State<CameraBottomBar> createState() => _CameraBottomBarState();
+}
+
+class _CameraBottomBarState extends State<CameraBottomBar> {
+  AssetEntity? _firstAsset;
+  Uint8List? _thumbData;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFirstAsset();
+  }
+
+  Future<void> _loadFirstAsset() async {
+    final ps = await PhotoManager.requestPermissionExtend();
+    if (!ps.isAuth) return;
+
+    final albums = await PhotoManager.getAssetPathList(
+      type: RequestType.image,
+      onlyAll: true,
+    );
+
+    if (albums.isNotEmpty) {
+      final recent = albums.first;
+      final assets = await recent.getAssetListRange(start: 0, end: 1);
+      if (assets.isNotEmpty) {
+        final thumb = await assets.first.thumbnailDataWithSize(
+          const ThumbnailSize(200, 200), // 注意这里要传 ThumbnailSize
+        );
+        setState(() {
+          _firstAsset = assets.first;
+          _thumbData = thumb;
+        });
+      }
+    }
+
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Container(
       height: 100,
@@ -23,7 +66,6 @@ class CameraBottomBar extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          /// 左右功能按钮
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -35,8 +77,19 @@ class CameraBottomBar extends StatelessWidget {
                 child: Container(
                   width: 48,
                   height: 48,
-                  color: Colors.grey,
-                  child: const Icon(Icons.photo, color: Colors.white),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: _thumbData == null
+                      ? const Icon(Icons.photo, color: Colors.white)
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.memory(
+                            _thumbData!,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
                 ),
               ),
 
@@ -45,16 +98,23 @@ class CameraBottomBar extends StatelessWidget {
                   /// 姿势库预览入口
                   GestureDetector(
                     onTap: () {
-                      if (onSelectPose != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => PoseLibraryScreen(onSelectPose: onSelectPose),
+                      if (widget.onSelectPose != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PoseLibraryScreen(
+                              onSelectPose: (imagePath, posePath) {
+                                widget.onSelectPose!(
+                                  imagePath: imagePath,
+                                  posePath: posePath,
+                                );
+                              },
                             ),
-                          );
-                        } else {
-                          Navigator.pushNamed(context, AppRoutes.poseLibrary);
-                        }
+                          ),
+                        );
+                      } else {
+                        Navigator.pushNamed(context, AppRoutes.poseLibrary);
+                      }
                     },
                     child: Container(
                       width: 48,
@@ -66,7 +126,7 @@ class CameraBottomBar extends StatelessWidget {
 
                   /// 前后相机切换按钮
                   IconButton(
-                    onPressed: onSwitchCamera,
+                    onPressed: widget.onSwitchCamera,
                     icon: const Icon(Icons.cameraswitch, color: Colors.white, size: 32),
                   ),
                 ],
@@ -74,10 +134,9 @@ class CameraBottomBar extends StatelessWidget {
             ],
           ),
 
-          /// 中间：拍摄按钮（始终居中）
-          /// 中间：拍摄按钮（始终居中）
+          /// 中间：拍摄按钮
           GestureDetector(
-            onTap: onTakePicture,
+            onTap: widget.onTakePicture,
             child: Container(
               width: 72,
               height: 72,

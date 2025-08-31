@@ -130,3 +130,10 @@ flutter:
     - assets/user/最近收藏/
     - assets/user/
     - assets/user/消息/
+    - assets/poses/
+    - assets/poses/单人/
+    - assets/poses/双人/
+    - assets/poses/多人/
+    - assets/poses/热门/
+    - assets/poses/收藏/
+    - assets/poses/情侣/

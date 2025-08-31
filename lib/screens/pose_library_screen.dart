@@ -3,7 +3,7 @@ import 'camera_screen.dart';
 import '../config/app_routes.dart';
 
 class PoseLibraryScreen extends StatefulWidget {
-  final void Function(String)? onSelectPose; // ✅ 回调函数
+  final void Function(String imagePath, String posePath)? onSelectPose;
 
   const PoseLibraryScreen({super.key, this.onSelectPose});
 
@@ -187,12 +187,14 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
                   );
                 }
                 final imagePath = categoryImages[index];
+                String posePath = imagePath.replaceFirst('original_picture', 'poses');
+                posePath = posePath.replaceAll(RegExp(r'\.\w+$'), '.png');
 
                 // ⚡ 点击跳转到 CameraScreen 并传递叠加图片
                 return GestureDetector(
                   onTap: () {
                     if (widget.onSelectPose != null) {
-                      widget.onSelectPose!(imagePath); // 调用回调更新 overlay
+                      widget.onSelectPose!(imagePath!, posePath!);
                     }
                     Navigator.pop(context); // 返回 CameraScreen
                   },

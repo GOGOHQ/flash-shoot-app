@@ -6,14 +6,14 @@ class CameraPreviewArea extends StatefulWidget {
   final CameraController? controller;
   final GridType gridType;
   final List<double> zoomLevels; // 自动检测到的可选倍率 (min ~ max)
-  final String? overlayImagePath; // 新增
+  final String? overlayPosePath; // 新增
 
   const CameraPreviewArea({
     super.key,
     required this.controller,
     required this.gridType,
     required this.zoomLevels,
-    this.overlayImagePath, // 新增
+    this.overlayPosePath, // 新增
   });
 
   @override
@@ -104,11 +104,11 @@ class _CameraPreviewAreaState extends State<CameraPreviewArea> {
             ),
           
           // 姿势叠加图
-          if (widget.overlayImagePath != null)
+          if (widget.overlayPosePath != null)
             Opacity(
               opacity: 0.5, // 半透明
               child: Image.asset(
-                widget.overlayImagePath!,
+                widget.overlayPosePath!,
                 fit: BoxFit.cover,
                 width: double.infinity,
                 height: double.infinity,
