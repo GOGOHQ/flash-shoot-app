@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../config/baidu_map_config.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
+import '../widgets/recommendation_bubble.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -25,6 +26,10 @@ class _MapScreenState extends State<MapScreen> {
   LocationFlutterPlugin? _locationPlugin;
   BMFCoordinate? _currentLocation;
   bool _isLocating = false;
+  
+  // 天气相关
+  bool _isLoadingWeather = false;
+  WeatherResponse? _weatherData;
   
   // 搜索相关
   final TextEditingController _searchController = TextEditingController();
@@ -93,13 +98,18 @@ class _MapScreenState extends State<MapScreen> {
 
   // 开始定位
   Future<void> _startLocation() async {
-    if (_locationPlugin == null) return;
+    debugPrint('=== 开始定位流程 ===');
+    if (_locationPlugin == null) {
+      debugPrint('定位插件未初始化');
+      return;
+    }
     
     setState(() {
       _isLocating = true;
     });
 
     try {
+      debugPrint('设置默认位置: ${BaiduMapConfig.defaultLatitude}, ${BaiduMapConfig.defaultLongitude}');
       // 使用默认位置（北京天安门）
       setState(() {
         _currentLocation = BMFCoordinate(
@@ -111,12 +121,46 @@ class _MapScreenState extends State<MapScreen> {
       
       // 更新地图到当前位置
       _updateMapToCurrentLocation();
+      
+      debugPrint('准备显示推荐气泡...');
+      // 显示推荐气泡
+      _showRecommendationBubble();
+      
+      debugPrint('=== 定位流程完成 ===');
     } catch (e) {
       debugPrint('开始定位失败: $e');
       setState(() {
         _isLocating = false;
       });
     }
+  }
+
+  // 显示推荐气泡
+  void _showRecommendationBubble() {
+    debugPrint('=== 显示推荐气泡 ===');
+    debugPrint('当前位置: ${_currentLocation?.latitude}, ${_currentLocation?.longitude}');
+    
+    if (_currentLocation == null) {
+      debugPrint('当前位置为空，无法显示推荐气泡');
+      _showSnackBar('请先获取当前位置');
+      return;
+    }
+
+    debugPrint('创建推荐气泡组件...');
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => RecommendationBubble(
+        lat: _currentLocation!.latitude,
+        lng: _currentLocation!.longitude,
+        onClose: () {
+          debugPrint('关闭推荐气泡');
+          Navigator.pop(context);
+        },
+      ),
+    );
+    debugPrint('推荐气泡已显示');
   }
 
   // 更新地图到当前位置
@@ -167,6 +211,59 @@ class _MapScreenState extends State<MapScreen> {
       
       // 显示模拟数据用于测试
       _showMockSearchResults(keyword);
+    }
+  }
+
+  // 获取天气信息
+  Future<void> _getWeatherInfo() async {
+    if (_currentLocation == null) {
+      _showSnackBar('请先获取当前位置');
+      return;
+    }
+
+    setState(() {
+      _isLoadingWeather = true;
+    });
+
+    try {
+      debugPrint('开始获取天气信息');
+      debugPrint('当前位置: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
+      
+      final weatherResponse = await _apiService.getWeatherByLocation(
+        location: Location(
+          lat: _currentLocation!.latitude,
+          lng: _currentLocation!.longitude,
+        ),
+      );
+      
+      setState(() {
+        _weatherData = weatherResponse;
+        _isLoadingWeather = false;
+      });
+      
+          debugPrint('天气数据获取成功: ${weatherResponse.result.now.text}');
+    debugPrint('天气数据获取成功 - 温度: ${weatherResponse.result.now.temp}°C');
+    debugPrint('天气数据获取成功 - 位置: ${weatherResponse.result.location.city}');
+      
+      // 导航到天气详情页面
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => WeatherDetailPage(
+            weatherData: weatherResponse,
+            location: Location(
+              lat: _currentLocation!.latitude,
+              lng: _currentLocation!.longitude,
+            ),
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('获取天气信息失败: $e');
+      setState(() {
+        _isLoadingWeather = false;
+      });
+      _showSnackBar('获取天气信息失败: 请检查网络连接或稍后重试');
     }
   }
 
@@ -252,6 +349,17 @@ class _MapScreenState extends State<MapScreen> {
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
         actions: [
+          IconButton(
+            onPressed: _getWeatherInfo,
+            icon: _isLoadingWeather 
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.wb_sunny),
+            tooltip: '天气预报',
+          ),
           IconButton(
             onPressed: _startLocation,
             icon: _isLocating 
@@ -387,17 +495,14 @@ class _MapScreenState extends State<MapScreen> {
     return Container(
       height: 100,
       padding: const EdgeInsets.symmetric(vertical: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _recommendItems.length,
-        itemBuilder: (context, index) {
-          final item = _recommendItems[index];
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: _recommendItems.map((item) {
           return GestureDetector(
             onTap: () => _searchPlaces(item['keyword']),
             child: Container(
               width: 80,
-              margin: const EdgeInsets.only(right: 16),
+              margin: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
@@ -430,7 +535,7 @@ class _MapScreenState extends State<MapScreen> {
               ),
             ),
           );
-        },
+        }).toList(),
       ),
     );
   }
@@ -474,6 +579,343 @@ class _MapScreenState extends State<MapScreen> {
       center: center,
       showDEMLayer: true,
     );
+  }
+}
+
+// 天气详情页面
+class WeatherDetailPage extends StatelessWidget {
+  final WeatherResponse weatherData;
+  final Location location;
+
+  const WeatherDetailPage({
+    super.key,
+    required this.weatherData,
+    required this.location,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('天气预报'),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            _buildWeatherCard(),
+            const SizedBox(height: 16),
+            _buildLocationInfo(),
+            const SizedBox(height: 16),
+            _buildLifeIndexes(),
+            const SizedBox(height: 16),
+            _buildWeatherDetails(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWeatherCard() {
+    final now = weatherData.result.now;
+    final location = weatherData.result.location;
+    
+    debugPrint('天气详情页面 - 当前天气数据:');
+    debugPrint('  温度: ${now.temp}°C');
+    debugPrint('  天气: ${now.text}');
+    debugPrint('  湿度: ${now.rh}%');
+    debugPrint('  风速: ${now.windClass}');
+    debugPrint('  风向: ${now.windDir}');
+    debugPrint('  体感温度: ${now.feelsLike}°C');
+    debugPrint('  空气质量: ${now.aqi}');
+
+    return Card(
+      elevation: 8,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF4A90E2), Color(0xFF357ABD)],
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      now.text,
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${location.city} ${location.name}',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+                Icon(
+                  _getWeatherIcon(now.text),
+                  size: 64,
+                  color: Colors.white,
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  '${now.temp}°',
+                  style: const TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const Text(
+                  'C',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildWeatherInfo('湿度', '${now.rh}%', Icons.water_drop),
+                _buildWeatherInfo('风速', now.windClass, Icons.air),
+                _buildWeatherInfo('风向', now.windDir, Icons.compass_calibration),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationInfo() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on, color: Colors.red, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '当前位置',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '纬度: ${location.lat.toStringAsFixed(4)}, 经度: ${location.lng.toStringAsFixed(4)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLifeIndexes() {
+    final indexes = weatherData.result.indexes;
+    
+    if (indexes.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '生活指数',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...indexes.take(6).map((index) => _buildIndexItem(index)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIndexItem(WeatherIndex index) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              index.name,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          Expanded(
+            flex: 3,
+            child: Text(
+              index.brief,
+              style: const TextStyle(color: Colors.blue),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherDetails() {
+    final forecasts = weatherData.result.forecasts;
+    
+    debugPrint('天气详情页面 - 预报数据: $forecasts');
+    debugPrint('天气详情页面 - 预报数据长度: ${forecasts.length}');
+
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '未来天气预报',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (forecasts.isNotEmpty)
+              ...forecasts.take(7).map((day) => _buildForecastItem(day))
+            else
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  '暂无预报数据',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForecastItem(WeatherForecast day) {
+    final date = day.date;
+    final weather = day.text;
+    final high = day.high;
+    final low = day.low;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: Text(
+              date,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Icon(_getWeatherIcon(weather), size: 20, color: Colors.blue),
+                const SizedBox(width: 8),
+                Text(weather),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              '$low° - $high°',
+              textAlign: TextAlign.right,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherInfo(String label, String value, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white, size: 24),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.white.withOpacity(0.8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  IconData _getWeatherIcon(String weather) {
+    if (weather.contains('晴')) return Icons.wb_sunny;
+    if (weather.contains('多云')) return Icons.cloud;
+    if (weather.contains('阴')) return Icons.cloud_queue;
+    if (weather.contains('雨')) return Icons.umbrella;
+    if (weather.contains('雪')) return Icons.ac_unit;
+    if (weather.contains('雾')) return Icons.cloud;
+    return Icons.wb_sunny;
   }
 }
 

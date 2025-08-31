@@ -82,14 +82,24 @@ class ApiService {
     String? q,
     bool? skipLogin,
   }) async {
+    debugPrint('=== 小红书API调用开始 ===');
+    debugPrint('参数: limit=$limit, q=$q, skipLogin=$skipLogin');
+    
     final queryParams = <String, String>{};
     
     if (limit != null) queryParams['limit'] = limit.toString();
     if (q != null) queryParams['q'] = q;
     if (skipLogin != null) queryParams['skip_login'] = skipLogin.toString();
 
+    debugPrint('查询参数: $queryParams');
     final response = await _get('/api/xhs/hot', queryParameters: queryParams);
-    return XhsHotResponse.fromJson(response);
+    debugPrint('小红书API原始响应: $response');
+    
+    final result = XhsHotResponse.fromJson(response);
+    debugPrint('小红书API解析结果: ${result.data.length} 条数据');
+    debugPrint('=== 小红书API调用完成 ===');
+    
+    return result;
   }
 
   /// 搜索帖子链接
@@ -176,7 +186,24 @@ class ApiService {
     if (radius != null) queryParams['radius'] = radius.toString();
 
     final response = await _get('/api/baidu-maps/search-places', queryParameters: queryParams);
-    return SearchPlacesResponse.fromJson(response);
+    debugPrint('搜索地点 API 原始响应: $response');
+    
+    // API 返回的是 {data: [地点数组]}，我们需要构造正确的格式
+    final placesList = response['data'] as List? ?? [];
+    debugPrint('搜索地点 API 地点数组: $placesList');
+    
+    // 构造 SearchPlacesResponse 期望的格式
+    final formattedResponse = {
+      'status': 0,
+      'message': 'success',
+      'result_type': 'place',
+      'query_type': 'search',
+      'results': placesList,
+    };
+    
+    debugPrint('搜索地点 API 格式化后数据: $formattedResponse');
+    
+    return SearchPlacesResponse.fromJson(formattedResponse);
   }
 
   /// 天气查询
@@ -189,7 +216,9 @@ class ApiService {
       'location': location,
     };
 
+    debugPrint('天气查询 API 请求参数: $queryParams');
     final response = await _get('/api/baidu-maps/weather', queryParameters: queryParams);
+    debugPrint('天气查询 API 原始响应: $response');
     return WeatherResponse.fromJson(response);
   }
 

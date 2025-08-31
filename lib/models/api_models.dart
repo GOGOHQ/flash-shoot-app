@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 // API 响应的基础模型
 class ApiResponse<T> {
   final T? data;
@@ -83,10 +85,19 @@ class Location {
   Location({required this.lng, required this.lat});
 
   factory Location.fromJson(Map<String, dynamic> json) {
-    return Location(
-      lng: (json['lng'] as num?)?.toDouble() ?? 0.0,
-      lat: (json['lat'] as num?)?.toDouble() ?? 0.0,
+    debugPrint('Location.fromJson 输入: $json');
+    
+    // 尝试不同的字段名
+    final lng = (json['lng'] ?? json['longitude'] ?? json['x']) as num?;
+    final lat = (json['lat'] ?? json['latitude'] ?? json['y']) as num?;
+    
+    final location = Location(
+      lng: lng?.toDouble() ?? 0.0,
+      lat: lat?.toDouble() ?? 0.0,
     );
+    
+    debugPrint('Location 解析结果: lng=${location.lng}, lat=${location.lat}');
+    return location;
   }
 
   Map<String, dynamic> toJson() => {
@@ -237,22 +248,44 @@ class PlaceDetailInfo {
   });
 
   factory PlaceDetailInfo.fromJson(Map<String, dynamic> json) {
-    return PlaceDetailInfo(
-      classifiedPoiTag: json['classified_poi_tag'] ?? '',
-      distance: json['distance'] ?? 0,
-      tag: json['tag'] ?? '',
-      naviLocation: json['navi_location'] != null 
-          ? Location.fromJson(json['navi_location']) 
-          : null,
-      type: json['type'] ?? '',
-      detailUrl: json['detail_url'] ?? '',
-      price: json['price'] ?? '',
-      overallRating: json['overall_rating'] ?? '',
-      commentNum: json['comment_num'] ?? '',
-      shopHours: json['shop_hours'] ?? '',
-      label: json['label'] ?? '',
-      children: json['children'] ?? [],
-    );
+    debugPrint('PlaceDetailInfo.fromJson 输入: $json');
+    
+    try {
+      final detailInfo = PlaceDetailInfo(
+        classifiedPoiTag: json['classified_poi_tag'] ?? json['category'] ?? '',
+        distance: json['distance'] ?? 0,
+        tag: json['tag'] ?? '',
+        naviLocation: json['navi_location'] != null 
+            ? Location.fromJson(json['navi_location']) 
+            : null,
+        type: json['type'] ?? '',
+        detailUrl: json['detail_url'] ?? '',
+        price: json['price'] ?? '',
+        overallRating: json['overall_rating'] ?? json['rating'] ?? '0',
+        commentNum: json['comment_num'] ?? json['comments'] ?? '0',
+        shopHours: json['shop_hours'] ?? json['hours'] ?? '',
+        label: json['label'] ?? '',
+        children: json['children'] ?? [],
+      );
+      debugPrint('PlaceDetailInfo 解析成功');
+      return detailInfo;
+    } catch (e) {
+      debugPrint('PlaceDetailInfo 解析失败: $e');
+      // 返回默认的 PlaceDetailInfo 对象
+      return PlaceDetailInfo(
+        classifiedPoiTag: '',
+        distance: 0,
+        tag: '',
+        type: '',
+        detailUrl: '',
+        price: '',
+        overallRating: '0',
+        commentNum: '0',
+        shopHours: '',
+        label: '',
+        children: [],
+      );
+    }
   }
 }
 
@@ -286,20 +319,55 @@ class Place {
   });
 
   factory Place.fromJson(Map<String, dynamic> json) {
-    return Place(
-      name: json['name'] ?? '',
-      location: Location.fromJson(json['location'] ?? {}),
-      address: json['address'] ?? '',
-      province: json['province'] ?? '',
-      city: json['city'] ?? '',
-      area: json['area'] ?? '',
-      town: json['town'] ?? '',
-      townCode: json['town_code'] ?? 0,
-      streetId: json['street_id'] ?? '',
-      detail: json['detail'] ?? 0,
-      uid: json['uid'] ?? '',
-      detailInfo: PlaceDetailInfo.fromJson(json['detail_info'] ?? {}),
-    );
+    debugPrint('Place.fromJson 输入: $json');
+    
+    try {
+      final place = Place(
+        name: json['name'] ?? json['title'] ?? '',
+        location: Location.fromJson(json['location'] ?? json['point'] ?? {}),
+        address: json['address'] ?? json['addr'] ?? '',
+        province: json['province'] ?? '',
+        city: json['city'] ?? '',
+        area: json['area'] ?? json['district'] ?? '',
+        town: json['town'] ?? '',
+        townCode: json['town_code'] ?? 0,
+        streetId: json['street_id'] ?? '',
+        detail: json['detail'] ?? 0,
+        uid: json['uid'] ?? json['id'] ?? '',
+        detailInfo: PlaceDetailInfo.fromJson(json['detail_info'] ?? json['detail'] ?? {}),
+      );
+      debugPrint('Place 解析成功: ${place.name}');
+      return place;
+    } catch (e) {
+      debugPrint('Place 解析失败: $e');
+      // 返回一个默认的 Place 对象
+      return Place(
+        name: json['name'] ?? '未知地点',
+        location: Location(lng: 0, lat: 0),
+        address: json['address'] ?? '',
+        province: '',
+        city: '',
+        area: '',
+        town: '',
+        townCode: 0,
+        streetId: '',
+        detail: 0,
+        uid: '',
+        detailInfo: PlaceDetailInfo(
+          classifiedPoiTag: '',
+          distance: 0,
+          tag: '',
+          type: '',
+          detailUrl: '',
+          price: '',
+          overallRating: '0',
+          commentNum: '0',
+          shopHours: '',
+          label: '',
+          children: [],
+        ),
+      );
+    }
   }
 }
 
@@ -319,24 +387,232 @@ class SearchPlacesResponse {
   });
 
   factory SearchPlacesResponse.fromJson(Map<String, dynamic> json) {
+    debugPrint('SearchPlacesResponse.fromJson 输入: $json');
+    
+    final resultsData = json['results'] as List? ?? [];
+    debugPrint('搜索结果数据: $resultsData');
+    
+    final results = resultsData.map((item) {
+      debugPrint('处理单个地点: $item');
+      return Place.fromJson(item);
+    }).toList();
+    
+    debugPrint('解析后的结果数量: ${results.length}');
+    
     return SearchPlacesResponse(
       status: json['status'] ?? 0,
       message: json['message'] ?? '',
       resultType: json['result_type'] ?? '',
       queryType: json['query_type'] ?? '',
-      results: (json['results'] as List?)
-          ?.map((item) => Place.fromJson(item))
-          .toList() ?? [],
+      results: results,
     );
   }
 }
 
 class WeatherResponse {
-  final Map<String, dynamic> data;
+  final int status;
+  final String message;
+  final WeatherResult result;
 
-  WeatherResponse({required this.data});
+  WeatherResponse({
+    required this.status,
+    required this.message,
+    required this.result,
+  });
 
   factory WeatherResponse.fromJson(Map<String, dynamic> json) {
-    return WeatherResponse(data: json);
+    // 处理嵌套的data结构
+    final data = json['data'] as Map<String, dynamic>? ?? json;
+    
+    return WeatherResponse(
+      status: data['status'] ?? 0,
+      message: data['message'] ?? '',
+      result: WeatherResult.fromJson(data['result'] ?? {}),
+    );
+  }
+}
+
+class WeatherResult {
+  final WeatherLocation location;
+  final WeatherNow now;
+  final List<WeatherIndex> indexes;
+  final List<dynamic> alerts;
+  final List<WeatherForecast> forecasts;
+
+  WeatherResult({
+    required this.location,
+    required this.now,
+    required this.indexes,
+    required this.alerts,
+    required this.forecasts,
+  });
+
+  factory WeatherResult.fromJson(Map<String, dynamic> json) {
+    return WeatherResult(
+      location: WeatherLocation.fromJson(json['location'] ?? {}),
+      now: WeatherNow.fromJson(json['now'] ?? {}),
+      indexes: (json['indexes'] as List?)
+          ?.map((item) => WeatherIndex.fromJson(item))
+          .toList() ?? [],
+      alerts: json['alerts'] as List? ?? [],
+      forecasts: (json['forecasts'] as List?)
+          ?.map((item) => WeatherForecast.fromJson(item))
+          .toList() ?? [],
+    );
+  }
+}
+
+class WeatherLocation {
+  final String country;
+  final String province;
+  final String city;
+  final String name;
+  final String id;
+
+  WeatherLocation({
+    required this.country,
+    required this.province,
+    required this.city,
+    required this.name,
+    required this.id,
+  });
+
+  factory WeatherLocation.fromJson(Map<String, dynamic> json) {
+    return WeatherLocation(
+      country: json['country'] ?? '',
+      province: json['province'] ?? '',
+      city: json['city'] ?? '',
+      name: json['name'] ?? '',
+      id: json['id'] ?? '',
+    );
+  }
+}
+
+class WeatherNow {
+  final String text;
+  final int temp;
+  final int feelsLike;
+  final int rh;
+  final String windClass;
+  final String windDir;
+  final int prec1h;
+  final int clouds;
+  final int vis;
+  final int aqi;
+  final int pm25;
+  final int pm10;
+  final int no2;
+  final int so2;
+  final int o3;
+  final double co;
+  final int windAngle;
+  final int uvi;
+  final int pressure;
+  final int dpt;
+  final String uptime;
+
+  WeatherNow({
+    required this.text,
+    required this.temp,
+    required this.feelsLike,
+    required this.rh,
+    required this.windClass,
+    required this.windDir,
+    required this.prec1h,
+    required this.clouds,
+    required this.vis,
+    required this.aqi,
+    required this.pm25,
+    required this.pm10,
+    required this.no2,
+    required this.so2,
+    required this.o3,
+    required this.co,
+    required this.windAngle,
+    required this.uvi,
+    required this.pressure,
+    required this.dpt,
+    required this.uptime,
+  });
+
+  factory WeatherNow.fromJson(Map<String, dynamic> json) {
+    return WeatherNow(
+      text: json['text'] ?? '',
+      temp: json['temp'] ?? 0,
+      feelsLike: json['feels_like'] ?? 0,
+      rh: json['rh'] ?? 0,
+      windClass: json['wind_class'] ?? '',
+      windDir: json['wind_dir'] ?? '',
+      prec1h: json['prec_1h'] ?? 0,
+      clouds: json['clouds'] ?? 0,
+      vis: json['vis'] ?? 0,
+      aqi: json['aqi'] ?? 0,
+      pm25: json['pm25'] ?? 0,
+      pm10: json['pm10'] ?? 0,
+      no2: json['no2'] ?? 0,
+      so2: json['so2'] ?? 0,
+      o3: json['o3'] ?? 0,
+      co: (json['co'] as num?)?.toDouble() ?? 0.0,
+      windAngle: json['wind_angle'] ?? 0,
+      uvi: json['uvi'] ?? 0,
+      pressure: json['pressure'] ?? 0,
+      dpt: json['dpt'] ?? 0,
+      uptime: json['uptime'] ?? '',
+    );
+  }
+}
+
+class WeatherIndex {
+  final String name;
+  final String brief;
+  final String detail;
+
+  WeatherIndex({
+    required this.name,
+    required this.brief,
+    required this.detail,
+  });
+
+  factory WeatherIndex.fromJson(Map<String, dynamic> json) {
+    return WeatherIndex(
+      name: json['name'] ?? '',
+      brief: json['brief'] ?? '',
+      detail: json['detail'] ?? '',
+    );
+  }
+}
+
+class WeatherForecast {
+  final String date;
+  final String text;
+  final int high;
+  final int low;
+  final String windDir;
+  final String windClass;
+  final int rh;
+  final int prec;
+
+  WeatherForecast({
+    required this.date,
+    required this.text,
+    required this.high,
+    required this.low,
+    required this.windDir,
+    required this.windClass,
+    required this.rh,
+    required this.prec,
+  });
+
+  factory WeatherForecast.fromJson(Map<String, dynamic> json) {
+    return WeatherForecast(
+      date: json['date'] ?? '',
+      text: json['text'] ?? '',
+      high: json['high'] ?? 0,
+      low: json['low'] ?? 0,
+      windDir: json['wind_dir'] ?? '',
+      windClass: json['wind_class'] ?? '',
+      rh: json['rh'] ?? 0,
+      prec: json['prec'] ?? 0,
+    );
   }
 }
