@@ -15,6 +15,7 @@ class CameraScreen extends StatefulWidget {
 class _CameraScreenState extends State<CameraScreen> {
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
+  List<double> _zoomLevels = [];
   bool _isFlashOn = false;
   GridType _gridType = GridType.none;
 
@@ -24,22 +25,37 @@ class _CameraScreenState extends State<CameraScreen> {
     _initCamera();
   }
 
-  Future<void> _initCamera() async {
-    try {
-      _cameras = await availableCameras();
-      if (_cameras!.isNotEmpty) {
-        _cameraController = CameraController(
-          _cameras![0],
-          ResolutionPreset.high,
-          enableAudio: false,
-        );
-        await _cameraController!.initialize();
-        if (mounted) setState(() {});
+Future<void> _initCamera() async {
+  try {
+    _cameras = await availableCameras();
+    if (_cameras!.isNotEmpty) {
+      _cameraController = CameraController(
+        _cameras![0],
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+      await _cameraController!.initialize();
+
+      // 读取相机支持的倍率范围
+      final minZoom = await _cameraController!.getMinZoomLevel();
+      final maxZoom = await _cameraController!.getMaxZoomLevel();
+
+      // 自动生成倍率列表（例如 1x, 2x, 3x ... 到最大值）
+      final List<double> zoomLevels = [];
+      for (double z = minZoom; z <= maxZoom; z += 1.0) {
+        zoomLevels.add(double.parse(z.toStringAsFixed(1)));
       }
-    } catch (e) {
-      debugPrint("初始化相机失败: $e");
+
+      if (mounted) {
+        setState(() {
+          _zoomLevels = zoomLevels;
+        });
+      }
     }
+  } catch (e) {
+    debugPrint("初始化相机失败: $e");
   }
+}
 
   Future<void> _toggleFlash() async {
     if (_cameraController == null) return;
@@ -122,8 +138,10 @@ class _CameraScreenState extends State<CameraScreen> {
               child: CameraPreviewArea(
                 controller: _cameraController,
                 gridType: _gridType,
+                zoomLevels: _zoomLevels,
               ),
             ),
+
 
             /// 底部栏
             CameraBottomBar(
