@@ -373,7 +373,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Image.network(
+          Image.asset(
             item['image']!,
             fit: BoxFit.cover,
             width: double.infinity,
@@ -398,7 +398,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
               children: [
                 CircleAvatar(
                   radius: 10,
-                  backgroundImage: NetworkImage(item['avatar']!),
+                  backgroundImage: AssetImage(item['avatar']!),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
