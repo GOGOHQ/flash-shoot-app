@@ -169,7 +169,7 @@ class _UserInfoScreenState extends State<UserInfoScreen> with SingleTickerProvid
                 ),
                 child: CircleAvatar(
                   radius: 40,
-                  backgroundImage: NetworkImage(_userData['avatar']!),
+                  backgroundImage: AssetImage(_userData['avatar']!),
                 ),
               ),
               const SizedBox(width: 16),

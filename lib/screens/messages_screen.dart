@@ -185,7 +185,7 @@ class MessagesScreen extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 25,
-            backgroundImage: NetworkImage(avatar),
+            backgroundImage: AssetImage(avatar),
           ),
           const SizedBox(width: 15),
           Expanded(
