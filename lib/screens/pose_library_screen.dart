@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
-import 'camera_screen.dart';
-import '../config/app_routes.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 class PoseLibraryScreen extends StatefulWidget {
   final void Function(String imagePath, String posePath)? onSelectPose;
@@ -13,223 +16,229 @@ class PoseLibraryScreen extends StatefulWidget {
 
 class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final List<String> tabs = ['收藏', '热门', '单人', '双人', '多人', '情侣', '用户上传'];
 
-  // 定义分类数据
-  final List<String> tabs = ['收藏', '热门', '单人', '双人', '多人', '情侣'];
-
-  // 图片数据
   final Map<String, List<String>> images = {
-    '收藏': [
-      'assets/original_picture/收藏/1.jpg',
-      'assets/original_picture/收藏/2.jpg',
-      'assets/original_picture/收藏/3.jpg',
-      'assets/original_picture/收藏/4.jpg',
-      'assets/original_picture/收藏/5.jpg',
-      'assets/original_picture/收藏/6.jpg',
-      'assets/original_picture/收藏/7.jpg',
-      'assets/original_picture/收藏/8.jpg',
-    ],
-    '热门': [
-      'assets/original_picture/热门/1.jpg',
-      'assets/original_picture/热门/2.jpg',
-      'assets/original_picture/热门/3.jpg',
-      'assets/original_picture/热门/4.jpg',
-      'assets/original_picture/热门/5.jpg',
-      'assets/original_picture/热门/6.jpg',
-      'assets/original_picture/热门/7.jpg',
-      'assets/original_picture/热门/8.jpg',
-    ],
-    '单人': [
-      'assets/original_picture/单人/1.jpg',
-      'assets/original_picture/单人/2.jpg',
-      'assets/original_picture/单人/3.jpg',
-      'assets/original_picture/单人/4.jpg',
-      'assets/original_picture/单人/5.jpg',
-      'assets/original_picture/单人/6.jpg',
-      'assets/original_picture/单人/7.jpg',
-      'assets/original_picture/单人/8.jpg',
-      'assets/original_picture/单人/9.jpg',
-      'assets/original_picture/单人/10.jpg',
-      'assets/original_picture/单人/11.jpg',
-      'assets/original_picture/单人/12.jpg',
-      'assets/original_picture/单人/13.jpg',
-      'assets/original_picture/单人/14.jpg',
-      'assets/original_picture/单人/15.jpg',
-    ],
-    '双人': [
-      'assets/original_picture/双人/1.jpg',
-      'assets/original_picture/双人/2.jpg',
-      'assets/original_picture/双人/3.jpg',
-      'assets/original_picture/双人/4.jpg',
-      'assets/original_picture/双人/5.jpg',
-      'assets/original_picture/双人/6.jpg',
-      'assets/original_picture/双人/7.jpg',
-      'assets/original_picture/双人/8.jpg',
-      'assets/original_picture/双人/9.jpg',
-      'assets/original_picture/双人/10.jpg',
-      'assets/original_picture/双人/11.jpg',
-      'assets/original_picture/双人/12.jpg',
-      'assets/original_picture/双人/13.jpg',
-      'assets/original_picture/双人/14.jpg',
-      'assets/original_picture/双人/15.jpg',
-      'assets/original_picture/双人/16.jpg',
-      'assets/original_picture/双人/17.jpg',
-      'assets/original_picture/双人/18.jpg',
-      'assets/original_picture/双人/19.jpg',
-      'assets/original_picture/双人/20.jpg',
-      'assets/original_picture/双人/21.jpg',
-    ],
-    '多人': [
-     'assets/original_picture/多人/1.jpg',
-      'assets/original_picture/多人/2.jpg',
-      'assets/original_picture/多人/3.jpg',
-      'assets/original_picture/多人/4.jpg',
-      'assets/original_picture/多人/5.jpg',
-      'assets/original_picture/多人/6.jpg',
-      'assets/original_picture/多人/7.jpg',
-      'assets/original_picture/多人/8.jpg',
-      'assets/original_picture/多人/9.jpg',
-      'assets/original_picture/多人/10.jpg',
-      'assets/original_picture/多人/11.jpg',
-      'assets/original_picture/多人/12.jpg',
-      'assets/original_picture/多人/13.jpg',
-      'assets/original_picture/多人/14.jpg',
-      'assets/original_picture/多人/15.jpg',
-      'assets/original_picture/多人/16.jpg',
-      'assets/original_picture/多人/17.jpg',
-      'assets/original_picture/多人/18.jpg',
-      'assets/original_picture/多人/19.jpg',
-      'assets/original_picture/多人/20.jpg',
-      'assets/original_picture/多人/21.jpg',
-      'assets/original_picture/多人/22.jpg',
-      'assets/original_picture/多人/23.jpg',
-      'assets/original_picture/多人/24.jpg',
-      'assets/original_picture/多人/25.jpg',
-      'assets/original_picture/多人/26.jpg',
-      'assets/original_picture/多人/27.jpg',
-      'assets/original_picture/多人/28.jpg',
-    ],
-    '情侣': [
-      'assets/original_picture/情侣/1.jpg',
-      'assets/original_picture/情侣/2.jpg',
-      'assets/original_picture/情侣/3.jpg',
-      'assets/original_picture/情侣/4.jpg',
-      'assets/original_picture/情侣/5.jpg',
-      'assets/original_picture/情侣/6.jpg',
-      'assets/original_picture/情侣/7.jpg',
-      'assets/original_picture/情侣/8.jpg',
-      'assets/original_picture/情侣/9.jpg',
-      'assets/original_picture/情侣/10.jpg',
-      'assets/original_picture/情侣/11.jpg',
-      'assets/original_picture/情侣/12.jpg',
-      'assets/original_picture/情侣/13.jpg',
-      'assets/original_picture/情侣/14.jpg',
-      'assets/original_picture/情侣/15.jpg',
-      'assets/original_picture/情侣/16.jpg',
-      'assets/original_picture/情侣/17.jpg',
-      'assets/original_picture/情侣/18.jpg',
-      'assets/original_picture/情侣/19.jpg',
-      'assets/original_picture/情侣/20.jpg',
-      'assets/original_picture/情侣/21.jpg',
-      'assets/original_picture/情侣/22.jpg',
-      'assets/original_picture/情侣/23.jpg',
-      'assets/original_picture/情侣/24.jpg',
-      'assets/original_picture/情侣/25.jpg',
-      'assets/original_picture/情侣/26.jpg',
-      'assets/original_picture/情侣/27.jpg',
-      'assets/original_picture/情侣/28.jpg',
-      'assets/original_picture/情侣/29.jpg',
-    ],
+    '收藏': ['assets/original_picture/收藏/1.jpg'],
+    '热门': ['assets/original_picture/热门/1.jpg'],
+    '单人': ['assets/original_picture/单人/1.jpg'],
+    '双人': ['assets/original_picture/双人/1.jpg'],
+    '多人': ['assets/original_picture/多人/1.jpg'],
+    '情侣': ['assets/original_picture/情侣/1.jpg'],
   };
+
+  // 你的后端地址
+  final String baseUrl = 'https://50b82cf769ca.ngrok-free.app';
+  final String wsUrl = 'wss://50b82cf769ca.ngrok-free.app/socket.io/?EIO=4&transport=websocket';
+
+  List<String> localMovedImages = [];
+  WebSocketChannel? _channel;
+  Timer? _pollingTimer;
+  int cacheSize = 0; // MB
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: tabs.length, vsync: this);
+    _loadLocalCache();
+    _fetchInitialMovedImages(); // ✅ 初始加载已有 moved 图片
+    _connectWebSocket();        // ✅ 监听新增图片
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _channel?.sink.close();
+    _pollingTimer?.cancel();
     super.dispose();
   }
 
-  Widget buildGridForCategory(String category) {
-      final categoryImages = images[category] ?? [];
-      bool isLoadingMore = false;
-        // 从 arguments 获取回调函数
-      return StatefulBuilder(
-        builder: (context, setState) {
-          return NotificationListener<ScrollNotification>(
-            onNotification: (scrollInfo) {
-              if (scrollInfo is ScrollUpdateNotification &&
-                  scrollInfo.metrics.pixels >=
-                      scrollInfo.metrics.maxScrollExtent * 0.8 &&
-                  !isLoadingMore) {
-                setState(() {
-                  isLoadingMore = true;
-                });
-                // 模拟预加载（可替换为实际数据加载）
-                Future.delayed(const Duration(seconds: 2), () {
-                  setState(() {
-                    isLoadingMore = false;
-                  });
-                });
-              }
-              return false;
-            },
-            child: GridView.builder(
-              padding: const EdgeInsets.all(8),
-              itemCount: categoryImages.length + (isLoadingMore ? 1 : 0),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // 两列
-                crossAxisSpacing: 8,
-                mainAxisSpacing: 8,
-                childAspectRatio: 3 / 4, // 正方形
-              ),
-              itemBuilder: (context, index) {
-                if (index == categoryImages.length && isLoadingMore) {
-                  return const Center(
-                    child: CircularProgressIndicator(),
-                  );
-                }
-                final imagePath = categoryImages[index];
-                String posePath = imagePath.replaceFirst('original_picture', 'poses');
-                posePath = posePath.replaceAll(RegExp(r'\.\w+$'), '.png');
+  Future<Directory> _getCacheDir() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final cacheDir = Directory("${dir.path}/pose_cache");
+    if (!await cacheDir.exists()) {
+      await cacheDir.create(recursive: true);
+    }
+    return cacheDir;
+  }
 
-                // ⚡ 点击跳转到 CameraScreen 并传递叠加图片
-                return GestureDetector(
-                  onTap: () {
-                    if (widget.onSelectPose != null) {
-                      widget.onSelectPose!(imagePath!, posePath!);
-                    }
-                    Navigator.pop(context); // 返回 CameraScreen
-                  },
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: FadeInImage(
-                      placeholder: const AssetImage('assets/placeholder.png'),
-                      image: AssetImage(imagePath),
-                      fit: BoxFit.cover,
-                      imageErrorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(Icons.error, color: Colors.red),
-                        );
-                      },
-                    ),
-                  ),
-                );
-              },
+  Future<void> _loadLocalCache() async {
+    final cacheDir = await _getCacheDir();
+    final files = cacheDir.listSync();
+    localMovedImages = files.map((f) => f.path).toList();
+    await _updateCacheSize();
+    setState(() {});
+  }
+
+  Future<void> _updateCacheSize() async {
+    final cacheDir = await _getCacheDir();
+    int totalSize = 0;
+    for (var f in cacheDir.listSync()) {
+      if (f is File) totalSize += await f.length();
+    }
+    setState(() {
+      cacheSize = (totalSize / (1024 * 1024)).ceil(); // MB
+    });
+  }
+
+  Future<String> _downloadAndCache(String url) async {
+    final cacheDir = await _getCacheDir();
+    final fileName = url.split('/').last;
+    final filePath = "${cacheDir.path}/$fileName";
+    final file = File(filePath);
+
+    if (!await file.exists()) {
+      try {
+        final resp = await Dio().get(url, options: Options(responseType: ResponseType.bytes));
+        await file.writeAsBytes(resp.data);
+        await _updateCacheSize();
+      } catch (e) {
+        print("下载失败: $e");
+      }
+    }
+    return file.path;
+  }
+
+  /// ✅ 初次进入时加载后端已有的 moved 图片
+  Future<void> _fetchInitialMovedImages() async {
+    try {
+      final resp = await Dio().get("$baseUrl/moved");
+      if (resp.statusCode == 200 && resp.data is List) {
+        for (String urlPath in resp.data) {
+          final imageUrl = "$baseUrl$urlPath";
+          final filePath = await _downloadAndCache(imageUrl);
+          if (!localMovedImages.contains(filePath)) {
+            localMovedImages.add(filePath);
+          }
+        }
+        setState(() {});
+      }
+    } catch (e) {
+      print("初始获取 moved 图片失败: $e");
+    }
+  }
+
+  /// ✅ 监听 WebSocket，新增图片实时更新
+  void _connectWebSocket() {
+    try {
+      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
+      _channel?.stream.listen((message) async {
+        if (message.toString().contains("/moved/")) {
+          final imageUrl = "$baseUrl${message.toString()}";
+          final filePath = await _downloadAndCache(imageUrl);
+          if (!localMovedImages.contains(filePath)) {
+            setState(() {
+              localMovedImages.add(filePath);
+            });
+          }
+        }
+      }, onError: (error) {
+        print("WebSocket error: $error");
+      }, onDone: () {
+        print("WebSocket closed, retrying...");
+        Future.delayed(const Duration(seconds: 5), _connectWebSocket);
+      });
+    } catch (e) {
+      print("WebSocket 连接失败: $e");
+    }
+  }
+
+  Widget buildGridForCategory(String category) {
+    if (category == '用户上传') {
+      if (localMovedImages.isEmpty) {
+        return const Center(child: Text("暂无上传图片"));
+      }
+      return GridView.builder(
+        padding: const EdgeInsets.all(8),
+        itemCount: localMovedImages.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 8,
+          mainAxisSpacing: 8,
+          childAspectRatio: 3 / 4,
+        ),
+        itemBuilder: (context, index) {
+          final filePath = localMovedImages[index];
+          return GestureDetector(
+            onTap: () {
+              if (widget.onSelectPose != null) {
+                widget.onSelectPose!(filePath, filePath);
+              }
+              Navigator.pop(context);
+            },
+            onLongPress: () async {
+              final file = File(filePath);
+              if (await file.exists()) {
+                await file.delete();
+              }
+              setState(() {
+                localMovedImages.removeAt(index);
+              });
+              await _updateCacheSize();
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.file(
+                File(filePath),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Center(child: Icon(Icons.broken_image));
+                },
+              ),
             ),
           );
         },
       );
     }
+
+    final categoryImages = images[category] ?? [];
+    return GridView.builder(
+      padding: const EdgeInsets.all(8),
+      itemCount: categoryImages.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: 3 / 4,
+      ),
+      itemBuilder: (context, index) {
+        final imagePath = categoryImages[index];
+        String posePath = imagePath.replaceFirst('original_picture', 'poses');
+        posePath = posePath.replaceAll(RegExp(r'\.\w+$'), '.png');
+
+        return GestureDetector(
+          onTap: () {
+            if (widget.onSelectPose != null) {
+              widget.onSelectPose!(imagePath, posePath);
+            }
+            Navigator.pop(context);
+          },
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              imagePath,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return const Center(child: Icon(Icons.error, color: Colors.red));
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('姿势库'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Center(child: Text("缓存: ${cacheSize}MB")),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           tabs: tabs.map((e) => Tab(text: e)).toList(),
@@ -243,18 +252,3 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
     );
   }
 }
-// import 'package:flutter/material.dart';
-
-// class PoseLibraryScreen extends StatelessWidget {
-//   const PoseLibraryScreen({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return Scaffold(
-//       appBar: AppBar(title: const Text("姿势库")),
-//       body: const Center(
-//         child: Text("这里是姿势库页面（TODO）"),
-//       ),
-//     );
-//   }
-// }

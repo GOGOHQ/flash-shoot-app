@@ -26,7 +26,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   double uploadProgress = 0.0; // 0.0 - 1.0
 
   // 本地后端地址（把 <YOUR_COMPUTER_IP> 替换为你电脑在同一 Wi-Fi 的 IP）
-  final String uploadUrl = 'http://192.168.0.161:8001/upload';
+  final String uploadUrl = 'https://50b82cf769ca.ngrok-free.app/upload';
 
   @override
   void initState() {
