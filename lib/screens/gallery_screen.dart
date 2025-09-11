@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:dio/dio.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'photo_detail_screen.dart';
 
 class GalleryScreen extends StatefulWidget {
@@ -25,13 +26,31 @@ class _GalleryScreenState extends State<GalleryScreen> {
   bool uploading = false;
   double uploadProgress = 0.0; // 0.0 - 1.0
 
-  // 本地后端地址（把 <YOUR_COMPUTER_IP> 替换为你电脑在同一 Wi-Fi 的 IP）
-  final String uploadUrl = 'https://50b82cf769ca.ngrok-free.app/upload';
+  // 本地后端地址
+  final String uploadUrl = 'https://1473e16831f6.ngrok-free.app/upload';
+  // 自动获取的 user_id
+  String? userId;
 
   @override
   void initState() {
     super.initState();
+    _initUserId();
     _fetchAssets();
+  }
+
+  // 获取设备唯一标识作为 user_id
+  Future<void> _initUserId() async {
+    final deviceInfo = DeviceInfoPlugin();
+    if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      setState(() {
+        userId = iosInfo.identifierForVendor ?? 'ios_guest';
+      });
+    } else {
+      setState(() {
+        userId = 'unknown';
+      });
+    }
   }
 
   Future<void> _fetchAssets() async {
@@ -58,7 +77,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
       else if (scaleFactor < 0.8) crossAxisCount = 5;
       else crossAxisCount = 3;
 
-      // 将 scaleFactor 归一化一下，避免快速累积
       scaleFactor = scaleFactor.clamp(0.5, 2.0);
     });
   }
@@ -80,7 +98,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
   }
 
   Future<void> _uploadSelected() async {
-    if (selectedIndices.isEmpty) return;
+    if (selectedIndices.isEmpty || userId == null) return;
+
     setState(() {
       uploading = true;
       uploadProgress = 0.0;
@@ -90,31 +109,27 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
     try {
       final formData = FormData();
-      int idx = 0;
+      formData.fields.add(MapEntry('user_id', userId!)); // 自动传 user_id
+
       final indices = selectedIndices.toList();
 
       for (var i in indices) {
         final asset = assets[i];
-        final file = await asset.file; // AssetEntity.file 返回 File?（iOS/Android）
-        if (file == null) continue; // 跳过无法获取到的
+        final file = await asset.file;
+        if (file == null) continue;
 
         final name = file.path.split(Platform.pathSeparator).last;
         formData.files.add(MapEntry(
           'files',
           await MultipartFile.fromFile(file.path, filename: name),
         ));
-        idx++;
       }
 
-      // 上传并监听进度
       final response = await dio.post(
         uploadUrl,
         data: formData,
         options: Options(
-          headers: {
-            'Accept': 'application/json',
-          },
-          // 需要的其他配置
+          headers: {'Accept': 'application/json'},
         ),
         onSendProgress: (sent, total) {
           if (total != 0) {
@@ -126,9 +141,8 @@ class _GalleryScreenState extends State<GalleryScreen> {
       );
 
       if (response.statusCode == 200) {
-        // 上传成功
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('上传成功')),
+          const SnackBar(content: Text('上传成功')),
         );
         setState(() {
           selectedIndices.clear();
@@ -157,16 +171,16 @@ class _GalleryScreenState extends State<GalleryScreen> {
       appBar: AppBar(
         title: selectionMode
             ? Text('${selectedIndices.length} selected')
-            : Text('Gallery'),
+            : const Text('Gallery'),
         actions: [
           if (selectionMode)
             IconButton(
-              icon: Icon(Icons.upload_file),
+              icon: const Icon(Icons.upload_file),
               onPressed: uploading ? null : _uploadSelected,
             ),
           if (selectionMode)
             IconButton(
-              icon: Icon(Icons.clear),
+              icon: const Icon(Icons.clear),
               onPressed: () {
                 setState(() {
                   selectedIndices.clear();
@@ -181,7 +195,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
           GestureDetector(
             onScaleUpdate: _onScaleUpdate,
             child: GridView.builder(
-              padding: EdgeInsets.all(4),
+              padding: const EdgeInsets.all(4),
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 4,
@@ -191,7 +205,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
               itemBuilder: (context, index) {
                 return FutureBuilder<Widget>(
                   future: assets[index]
-                      .thumbnailDataWithSize(ThumbnailSize(200, 200))
+                      .thumbnailDataWithSize(const ThumbnailSize(200, 200))
                       .then((data) => Image.memory(data!, fit: BoxFit.cover)),
                   builder: (context, snapshot) {
                     if (!snapshot.hasData) return Container(color: Colors.grey[300]);
@@ -230,7 +244,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                                   shape: BoxShape.circle,
                                   color: selected ? Colors.blue : Colors.black26,
                                 ),
-                                padding: EdgeInsets.all(4),
+                                padding: const EdgeInsets.all(4),
                                 child: Icon(
                                   selected ? Icons.check : Icons.circle,
                                   size: 18,
@@ -246,7 +260,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
               },
             ),
           ),
-
           if (uploading)
             Positioned(
               left: 0,

@@ -1,69 +1,101 @@
 from flask import Flask, request, jsonify, send_from_directory
-from flask_socketio import SocketIO, emit
 import os
+import time
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'secret!'
-
-# 配置 SocketIO，允许跨域
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 UPLOAD_FOLDER = 'uploads'
 MOVED_FOLDER = 'moved'
+XIANGAO_FOLDER = 'xiangao'
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(MOVED_FOLDER, exist_ok=True)
+os.makedirs(XIANGAO_FOLDER, exist_ok=True)
+
+
+def get_user_folder(base, user_id):
+    folder = os.path.join(base, f"user_{user_id}")
+    os.makedirs(folder, exist_ok=True)
+    return folder
+
+
+def timestamp_filename(ext):
+    """根据当前时间戳生成文件名"""
+    ts = int(time.time() * 1000)  # 毫秒
+    return f"{ts}{ext}"
 
 
 @app.route('/upload', methods=['POST'])
 def upload():
+    user_id = request.form.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
+
     files = request.files.getlist('files')
     saved = []
+
+    user_upload_folder = get_user_folder(UPLOAD_FOLDER, user_id)
+    user_moved_folder = get_user_folder(MOVED_FOLDER, user_id)
+
     for f in files:
         if f.filename == '':
             continue
-        path = os.path.join(UPLOAD_FOLDER, f.filename)
-        f.save(path)
-        saved.append(path)
+        ext = os.path.splitext(f.filename)[1].lower()  # 保留原扩展名
+        new_filename = timestamp_filename(ext)
 
-        # 假设逻辑是：上传后文件会被移动到 moved 目录（这里可以根据你需求调整）
-        moved_path = os.path.join(MOVED_FOLDER, f.filename)
-        os.rename(path, moved_path)
+        upload_path = os.path.join(user_upload_folder, new_filename)
+        f.save(upload_path)
+        saved.append(upload_path)
 
-        # 触发 WebSocket 推送
-        socketio.emit('new_image', f"/moved/{f.filename}")
+        # 移动到 moved
+        moved_path = os.path.join(user_moved_folder, new_filename)
+        if os.name == 'nt':
+            os.system(f'copy "{upload_path}" "{moved_path}"')
+        else:
+            os.system(f'cp "{upload_path}" "{moved_path}"')
 
     return jsonify({'saved': saved}), 200
 
 
-# 返回 moved 文件夹里的所有图片路径
 @app.route('/moved', methods=['GET'])
 def list_moved():
-    files = []
-    for fname in os.listdir(MOVED_FOLDER):
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
+
+    moved_files = []
+    user_moved_folder = get_user_folder(MOVED_FOLDER, user_id)
+    for fname in os.listdir(user_moved_folder):
         if fname.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
-            files.append(f"/moved/{fname}")
-    return jsonify(files), 200
+            moved_files.append(f"/moved/user_{user_id}/{fname}")
+
+    return jsonify(sorted(moved_files, reverse=True)), 200  # 倒序返回
 
 
-# 让前端可以直接访问 /moved/<filename>
-@app.route('/moved/<path:filename>', methods=['GET'])
-def get_moved_file(filename):
-    return send_from_directory(MOVED_FOLDER, filename)
+@app.route('/xiangao', methods=['GET'])
+def list_xiangao():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
+
+    xiangao_files = []
+    user_xiangao_folder = get_user_folder(XIANGAO_FOLDER, user_id)
+    for fname in os.listdir(user_xiangao_folder):
+        if fname.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+            xiangao_files.append(f"/xiangao/user_{user_id}/{fname}")
+
+    return jsonify(sorted(xiangao_files, reverse=True)), 200  # 倒序返回
 
 
-# WebSocket 连接事件
-@socketio.on('connect')
-def handle_connect():
-    print("Client connected")
-    emit('message', {'msg': 'Connected to server'})
+@app.route('/moved/<user_folder>/<path:filename>', methods=['GET'])
+def get_moved_file(user_folder, filename):
+    return send_from_directory(os.path.join(MOVED_FOLDER, user_folder), filename)
 
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    print("Client disconnected")
+@app.route('/xiangao/<user_folder>/<path:filename>', methods=['GET'])
+def get_xiangao_file(user_folder, filename):
+    return send_from_directory(os.path.join(XIANGAO_FOLDER, user_folder), filename)
 
 
 if __name__ == '__main__':
-    # 用 socketio.run 替代 app.run
-    socketio.run(app, host='0.0.0.0', port=8001, debug=True)
+    app.run(host='0.0.0.0', port=8001, debug=True)

@@ -3,18 +3,23 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:web_socket_channel/web_socket_channel.dart';
 
 class PoseLibraryScreen extends StatefulWidget {
+  final String userId; // 用户 ID
   final void Function(String imagePath, String posePath)? onSelectPose;
 
-  const PoseLibraryScreen({super.key, this.onSelectPose});
+  const PoseLibraryScreen({
+    super.key,
+    required this.userId,
+    this.onSelectPose,
+  });
 
   @override
   State<PoseLibraryScreen> createState() => _PoseLibraryScreenState();
 }
 
-class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTickerProviderStateMixin {
+class _PoseLibraryScreenState extends State<PoseLibraryScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final List<String> tabs = ['收藏', '热门', '单人', '双人', '多人', '情侣', '用户上传'];
 
@@ -27,62 +32,66 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
     '情侣': ['assets/original_picture/情侣/1.jpg'],
   };
 
-  // 你的后端地址
-  final String baseUrl = 'https://50b82cf769ca.ngrok-free.app';
-  final String wsUrl = 'wss://50b82cf769ca.ngrok-free.app/socket.io/?EIO=4&transport=websocket';
+  final String baseUrl = 'https://1473e16831f6.ngrok-free.app';
 
   List<String> localMovedImages = [];
-  WebSocketChannel? _channel;
-  Timer? _pollingTimer;
+  List<String> localXiangaoImages = [];
+  Set<String> readFiles = {}; // 已读取文件集合
   int cacheSize = 0; // MB
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: tabs.length, vsync: this);
-    _loadLocalCache();
-    _fetchInitialMovedImages(); // ✅ 初始加载已有 moved 图片
-    _connectWebSocket();        // ✅ 监听新增图片
+    _initData();
   }
 
   @override
   void dispose() {
     _tabController.dispose();
-    _channel?.sink.close();
-    _pollingTimer?.cancel();
     super.dispose();
   }
 
-  Future<Directory> _getCacheDir() async {
+  /// 获取缓存目录
+  Future<Directory> _getCacheDir(String folderName) async {
     final dir = await getApplicationDocumentsDirectory();
-    final cacheDir = Directory("${dir.path}/pose_cache");
-    if (!await cacheDir.exists()) {
-      await cacheDir.create(recursive: true);
-    }
+    final cacheDir = Directory("${dir.path}/pose_cache/${widget.userId}/$folderName");
+    if (!await cacheDir.exists()) await cacheDir.create(recursive: true);
     return cacheDir;
   }
 
+  /// 加载本地缓存
   Future<void> _loadLocalCache() async {
-    final cacheDir = await _getCacheDir();
-    final files = cacheDir.listSync();
-    localMovedImages = files.map((f) => f.path).toList();
+    // moved
+    final movedDir = await _getCacheDir('moved');
+    final movedFiles = movedDir.listSync().whereType<File>().toList();
+    localMovedImages = movedFiles.map((f) => f.path).toList();
+    readFiles.addAll(localMovedImages.map((e) => e.split('/').last));
+
+    // xiangao
+    final xiangaoDir = await _getCacheDir('xiangao');
+    final xiangaoFiles = xiangaoDir.listSync().whereType<File>().toList();
+    localXiangaoImages = xiangaoFiles.map((f) => f.path).toList();
+    readFiles.addAll(localXiangaoImages.map((e) => e.split('/').last));
+
     await _updateCacheSize();
     setState(() {});
   }
 
+  /// 更新缓存大小
   Future<void> _updateCacheSize() async {
-    final cacheDir = await _getCacheDir();
     int totalSize = 0;
-    for (var f in cacheDir.listSync()) {
-      if (f is File) totalSize += await f.length();
+    for (var file in [...localMovedImages, ...localXiangaoImages].map((e) => File(e))) {
+      if (await file.exists()) totalSize += await file.length();
     }
     setState(() {
-      cacheSize = (totalSize / (1024 * 1024)).ceil(); // MB
+      cacheSize = (totalSize / (1024 * 1024)).ceil();
     });
   }
 
-  Future<String> _downloadAndCache(String url) async {
-    final cacheDir = await _getCacheDir();
+  /// 下载文件到缓存
+  Future<String> _downloadAndCache(String url, String folder) async {
+    final cacheDir = await _getCacheDir(folder);
     final fileName = url.split('/').last;
     final filePath = "${cacheDir.path}/$fileName";
     final file = File(filePath);
@@ -99,55 +108,54 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
     return file.path;
   }
 
-  /// ✅ 初次进入时加载后端已有的 moved 图片
-  Future<void> _fetchInitialMovedImages() async {
+  /// 初始化加载后端 moved 和 xiangao 图片，只下载未读取的新文件
+  Future<void> _initData() async {
+    await _loadLocalCache();
+    await _fetchNewFiles('moved');
+    await _fetchNewFiles('xiangao');
+  }
+
+  Future<void> _fetchNewFiles(String folder) async {
     try {
-      final resp = await Dio().get("$baseUrl/moved");
+      final resp = await Dio().get("$baseUrl/$folder", queryParameters: {"user_id": widget.userId});
       if (resp.statusCode == 200 && resp.data is List) {
+        List<String> newFiles = [];
         for (String urlPath in resp.data) {
-          final imageUrl = "$baseUrl$urlPath";
-          final filePath = await _downloadAndCache(imageUrl);
-          if (!localMovedImages.contains(filePath)) {
-            localMovedImages.add(filePath);
-          }
+          final fileName = urlPath.split('/').last;
+          if (readFiles.contains(fileName)) continue;
+          final filePath = await _downloadAndCache("$baseUrl$urlPath", folder);
+          newFiles.add(filePath);
+          readFiles.add(fileName);
         }
+        if (folder == 'moved') localMovedImages.addAll(newFiles);
+        if (folder == 'xiangao') localXiangaoImages.addAll(newFiles);
+
+        // 倒序排序
+        if (folder == 'moved') {
+          localMovedImages.sort((a, b) => b.split('/').last.compareTo(a.split('/').last));
+        } else {
+          localXiangaoImages.sort((a, b) => b.split('/').last.compareTo(a.split('/').last));
+        }
+
+        await _updateCacheSize();
         setState(() {});
       }
     } catch (e) {
-      print("初始获取 moved 图片失败: $e");
+      print("获取新 $folder 图片失败: $e");
     }
   }
 
-  /// ✅ 监听 WebSocket，新增图片实时更新
-  void _connectWebSocket() {
-    try {
-      _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
-      _channel?.stream.listen((message) async {
-        if (message.toString().contains("/moved/")) {
-          final imageUrl = "$baseUrl${message.toString()}";
-          final filePath = await _downloadAndCache(imageUrl);
-          if (!localMovedImages.contains(filePath)) {
-            setState(() {
-              localMovedImages.add(filePath);
-            });
-          }
-        }
-      }, onError: (error) {
-        print("WebSocket error: $error");
-      }, onDone: () {
-        print("WebSocket closed, retrying...");
-        Future.delayed(const Duration(seconds: 5), _connectWebSocket);
-      });
-    } catch (e) {
-      print("WebSocket 连接失败: $e");
-    }
+  String _getFileNameWithoutExtension(String path) {
+    final name = path.split('/').last;
+    final dotIndex = name.lastIndexOf('.');
+    if (dotIndex != -1) return name.substring(0, dotIndex);
+    return name;
   }
 
   Widget buildGridForCategory(String category) {
     if (category == '用户上传') {
-      if (localMovedImages.isEmpty) {
-        return const Center(child: Text("暂无上传图片"));
-      }
+      if (localMovedImages.isEmpty) return const Center(child: Text("暂无上传图片"));
+
       return GridView.builder(
         padding: const EdgeInsets.all(8),
         itemCount: localMovedImages.length,
@@ -158,20 +166,28 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
           childAspectRatio: 3 / 4,
         ),
         itemBuilder: (context, index) {
-          final filePath = localMovedImages[index];
+          final imagePath = localMovedImages[index];
+          String posePath = imagePath; // 默认 posePath = imagePath
+
+          // 判断是否在 localXiangaoImages 中存在同名文件
+          final fileName = _getFileNameWithoutExtension(imagePath);
+          final matchXiangao = localXiangaoImages.firstWhere(
+            (e) => _getFileNameWithoutExtension(e) == fileName,
+            orElse: () => '',
+          );
+          if (matchXiangao.isNotEmpty) {
+            posePath = matchXiangao; // 如果存在就用 Xiangao 对应路径
+          }
           return GestureDetector(
             onTap: () {
-              if (widget.onSelectPose != null) {
-                widget.onSelectPose!(filePath, filePath);
-              }
+              widget.onSelectPose?.call(imagePath, posePath);
               Navigator.pop(context);
             },
             onLongPress: () async {
-              final file = File(filePath);
-              if (await file.exists()) {
-                await file.delete();
-              }
+              final file = File(imagePath);
+              if (await file.exists()) await file.delete();
               setState(() {
+                readFiles.remove(imagePath.split('/').last);
                 localMovedImages.removeAt(index);
               });
               await _updateCacheSize();
@@ -179,11 +195,10 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: Image.file(
-                File(filePath),
+                File(imagePath),
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(child: Icon(Icons.broken_image));
-                },
+                errorBuilder: (context, error, stackTrace) =>
+                    const Center(child: Icon(Icons.broken_image)),
               ),
             ),
           );
@@ -203,14 +218,12 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
       ),
       itemBuilder: (context, index) {
         final imagePath = categoryImages[index];
-        String posePath = imagePath.replaceFirst('original_picture', 'poses');
-        posePath = posePath.replaceAll(RegExp(r'\.\w+$'), '.png');
+        String posePath = imagePath.replaceFirst('original_picture', 'poses')
+            .replaceAll(RegExp(r'\.\w+$'), '.png');
 
         return GestureDetector(
           onTap: () {
-            if (widget.onSelectPose != null) {
-              widget.onSelectPose!(imagePath, posePath);
-            }
+            widget.onSelectPose?.call(imagePath, posePath);
             Navigator.pop(context);
           },
           child: ClipRRect(
@@ -218,9 +231,8 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
             child: Image.asset(
               imagePath,
               fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return const Center(child: Icon(Icons.error, color: Colors.red));
-              },
+              errorBuilder: (context, error, stackTrace) =>
+                  const Center(child: Icon(Icons.error, color: Colors.red)),
             ),
           ),
         );
@@ -252,3 +264,7 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen> with SingleTicker
     );
   }
 }
+
+
+
+

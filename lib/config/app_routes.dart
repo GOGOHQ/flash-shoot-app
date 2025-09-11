@@ -53,7 +53,19 @@ class AppRoutes {
       case result:
         return MaterialPageRoute(builder: (_) => const SearchResultScreen());
       case poseLibrary:
-        return MaterialPageRoute(builder: (_) => const PoseLibraryScreen());
+        // 从 arguments 里获取 userId
+        final args = settings.arguments as Map<String, dynamic>?;
+        final userId = args?['userId'] as String?; // 可能为 null
+        if (userId == null) {
+          return MaterialPageRoute(
+            builder: (_) => const Scaffold(
+              body: Center(child: Text('❌ userId is required for PoseLibraryScreen')),
+            ),
+          );
+        }
+        return MaterialPageRoute(
+          builder: (_) => PoseLibraryScreen(userId: userId),
+        );
       case apiTest:
         return MaterialPageRoute(builder: (_) => const ApiTestScreen());
       case networkTest:

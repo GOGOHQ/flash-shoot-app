@@ -1,8 +1,11 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import '../config/app_routes.dart';
 import '../screens/pose_library_screen.dart';
 import 'dart:typed_data';
+import 'package:device_info_plus/device_info_plus.dart';
+
 
 class CameraBottomBar extends StatefulWidget {
   final VoidCallback? onTakePicture;
@@ -26,11 +29,30 @@ class CameraBottomBar extends StatefulWidget {
 class _CameraBottomBarState extends State<CameraBottomBar> {
   AssetEntity? _firstAsset;
   Uint8List? _thumbData;
+  
+  // 自动获取的 user_id
+  String? userId;
 
   @override
   void initState() {
     super.initState();
+    _initUserId();
     _loadFirstAsset();
+  }
+
+    // 获取设备唯一标识作为 user_id
+  Future<void> _initUserId() async {
+    final deviceInfo = DeviceInfoPlugin();
+    if (Platform.isIOS) {
+      final iosInfo = await deviceInfo.iosInfo;
+      setState(() {
+        userId = iosInfo.identifierForVendor ?? 'ios_guest';
+      });
+    } else {
+      setState(() {
+        userId = 'unknown';
+      });
+    }
   }
 
   Future<void> _loadFirstAsset() async {
@@ -103,6 +125,7 @@ class _CameraBottomBarState extends State<CameraBottomBar> {
                           context,
                           MaterialPageRoute(
                             builder: (_) => PoseLibraryScreen(
+                              userId: userId ?? 'unknown',
                               onSelectPose: (imagePath, posePath) {
                                 widget.onSelectPose!(
                                   imagePath: imagePath,
