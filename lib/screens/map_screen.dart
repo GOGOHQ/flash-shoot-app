@@ -9,6 +9,8 @@ import '../services/api_service.dart';
 import '../models/api_models.dart';
 import '../widgets/recommendation_bubble.dart';
 import 'poi_detail_screen.dart';
+import 'weather_detail_screen.dart';
+import 'dart:math' as math;
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -43,6 +45,10 @@ class _MapScreenState extends State<MapScreen> {
   Place? _selectedPoi;
   Offset? _bubblePosition;
   
+  // 预加载相关
+  bool _isPreloading = false;
+  bool _hasPreloadedData = false;
+  
   
   // 推荐项目
   final List<Map<String, dynamic>> _recommendItems = [
@@ -55,6 +61,8 @@ class _MapScreenState extends State<MapScreen> {
   void initState() {
     super.initState();
     _initBaiduMap();
+    // 开始预加载POI数据
+    _startPreloading();
   }
 
   @override
@@ -126,6 +134,16 @@ class _MapScreenState extends State<MapScreen> {
       // 更新地图到当前位置
       _updateMapToCurrentLocation();
       
+      // 调用测试输出指定POI
+      try {
+        await _apiService.debugPrintSpecifiedPois(
+          lat: _currentLocation!.latitude,
+          lng: _currentLocation!.longitude,
+        );
+      } catch (e) {
+        debugPrint('调试输出指定POI失败: $e');
+      }
+      
       debugPrint('=== 默认位置设置完成 ===');
     } catch (e) {
       debugPrint('设置默认位置失败: $e');
@@ -157,6 +175,16 @@ class _MapScreenState extends State<MapScreen> {
       
       // 更新地图到当前位置
       _updateMapToCurrentLocation();
+      
+      // 调用测试输出指定POI
+      try {
+        await _apiService.debugPrintSpecifiedPois(
+          lat: _currentLocation!.latitude,
+          lng: _currentLocation!.longitude,
+        );
+      } catch (e) {
+        debugPrint('调试输出指定POI失败: $e');
+      }
       
       debugPrint('准备显示推荐气泡...');
       // 显示推荐气泡
@@ -210,6 +238,13 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
+    // 如果已有预加载数据，直接使用
+    if (_hasPreloadedData && _nearbyPois.isNotEmpty) {
+      debugPrint('使用预加载的POI数据，共 ${_nearbyPois.length} 个');
+      _addPoiMarkers();
+      return;
+    }
+
     setState(() {
       _isLoadingPois = true;
     });
@@ -217,89 +252,211 @@ class _MapScreenState extends State<MapScreen> {
     try {
       debugPrint('=== 开始加载周围 POI ===');
       debugPrint('当前位置: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
-      
-      // 只获取景点类型的 POI，过滤掉美食
+
       final List<Place> allPois = [];
-      
-      // 1. 获取景点 POI（主要类型）
-      debugPrint('正在获取景点 POI...');
-      try {
-        final attractionResponse = await _apiService.searchPlaces(
-          q: '景点',
-          location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
-          radius: 15000, // 扩大搜索范围到15公里
-          limit: 20, // 增加返回数量
-        );
-        allPois.addAll(attractionResponse.results);
-        debugPrint('获取到 ${attractionResponse.results.length} 个景点 POI');
-      } catch (e) {
-        debugPrint('获取景点 POI 失败: $e');
+
+      final locationStr = '${_currentLocation!.latitude},${_currentLocation!.longitude}';
+      final radius = 15000;
+
+      final hasSpecifiedKeywords = BaiduMapConfig.specifiedPoiKeywords.isNotEmpty;
+      final hasSpecifiedUids = BaiduMapConfig.specifiedPoiUids.isNotEmpty;
+
+      if (hasSpecifiedKeywords) {
+        debugPrint('启用指定关键词检索: ${BaiduMapConfig.specifiedPoiKeywords}');
+        
+        // 第一步：通过 geocode 获取白名单关键词的精确坐标
+        final Map<String, Location> keywordLocations = {};
+        for (final keyword in BaiduMapConfig.specifiedPoiKeywords) {
+          try {
+            debugPrint('正在地理编码: "$keyword"');
+            final geocodeResp = await _apiService.geocode(address: keyword);
+            debugPrint('"$keyword" 地理编码响应: status=${geocodeResp.status}');
+            if (geocodeResp.status == 0) {
+              keywordLocations[keyword] = geocodeResp.result.location;
+              debugPrint('关键词 "$keyword" 坐标: (${geocodeResp.result.location.lat}, ${geocodeResp.result.location.lng})');
+            } else {
+              debugPrint('关键词 "$keyword" 地理编码失败: status=${geocodeResp.status}');
+              // 尝试添加城市信息重新编码
+              try {
+                final retryResp = await _apiService.geocode(address: '北京$keyword');
+                if (retryResp.status == 0) {
+                  keywordLocations[keyword] = retryResp.result.location;
+                  debugPrint('关键词 "$keyword" 重试成功，坐标: (${retryResp.result.location.lat}, ${retryResp.result.location.lng})');
+                } else {
+                  debugPrint('关键词 "$keyword" 重试也失败: status=${retryResp.status}');
+                }
+              } catch (retryE) {
+                debugPrint('关键词 "$keyword" 重试异常: $retryE');
+              }
+            }
+          } catch (e) {
+            debugPrint('关键词 "$keyword" 地理编码异常: $e');
+          }
+          // 控制请求节奏
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+        
+        // 第二步：基于获取到的坐标，使用 searchPlaces 获取具体POI信息
+        for (final entry in keywordLocations.entries) {
+          final keyword = entry.key;
+          final location = entry.value;
+          try {
+            debugPrint('基于坐标检索 "$keyword" 在 (${location.lat}, ${location.lng})');
+            final resp = await _apiService.searchPlaces(
+              q: keyword,
+              location: '${location.lat},${location.lng}',
+              radius: 5000, // 增大搜索半径，环球影城面积大
+              limit: 10, // 增加数量，提高找到的概率
+            );
+            debugPrint('"$keyword" 搜索结果: ${resp.results.length} 条');
+            for (final result in resp.results) {
+              debugPrint('  - ${result.name} (${result.location.lat}, ${result.location.lng})');
+            }
+            allPois.addAll(resp.results);
+            
+            // 如果没找到结果，尝试更宽泛的搜索
+            if (resp.results.isEmpty && keyword == '环球影城') {
+              debugPrint('"$keyword" 未找到，尝试更宽泛搜索...');
+              final broadResp = await _apiService.searchPlaces(
+                q: '环球影城',
+                location: '${location.lat},${location.lng}',
+                radius: 10000, // 更大的搜索半径
+                limit: 20,
+              );
+              debugPrint('"$keyword" 宽泛搜索结果: ${broadResp.results.length} 条');
+              for (final result in broadResp.results) {
+                debugPrint('  - ${result.name} (${result.location.lat}, ${result.location.lng})');
+              }
+              allPois.addAll(broadResp.results);
+            }
+          } catch (e) {
+            debugPrint('基于坐标检索 "$keyword" 失败: $e');
+          }
+          // 控制请求节奏
+          await Future.delayed(const Duration(milliseconds: 500));
+        }
+      } else {
+        // 保持原逻辑：景点、公园、博物馆、历史建筑
+        try {
+          final attractionResponse = await _apiService.searchPlaces(
+            q: '景点',
+            location: locationStr,
+            radius: radius,
+            limit: 20,
+          );
+          allPois.addAll(attractionResponse.results);
+          debugPrint('获取到 ${attractionResponse.results.length} 个景点 POI');
+        } catch (e) {
+          debugPrint('获取景点 POI 失败: $e');
+        }
+
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        try {
+          final parkResponse = await _apiService.searchPlaces(
+            q: '公园',
+            location: locationStr,
+            radius: radius,
+            limit: 15,
+          );
+          allPois.addAll(parkResponse.results);
+          debugPrint('获取到 ${parkResponse.results.length} 个公园 POI');
+        } catch (e) {
+          debugPrint('获取公园 POI 失败: $e');
+        }
+
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        try {
+          final museumResponse = await _apiService.searchPlaces(
+            q: '博物馆',
+            location: locationStr,
+            radius: radius,
+            limit: 10,
+          );
+          allPois.addAll(museumResponse.results);
+          debugPrint('获取到 ${museumResponse.results.length} 个博物馆 POI');
+        } catch (e) {
+          debugPrint('获取博物馆 POI 失败: $e');
+        }
+
+        await Future.delayed(const Duration(milliseconds: 800));
+
+        try {
+          final historicResponse = await _apiService.searchPlaces(
+            q: '历史建筑',
+            location: locationStr,
+            radius: radius,
+            limit: 10,
+          );
+          allPois.addAll(historicResponse.results);
+          debugPrint('获取到 ${historicResponse.results.length} 个历史建筑 POI');
+        } catch (e) {
+          debugPrint('获取历史建筑 POI 失败: $e');
+        }
       }
       
-      // 添加请求间隔，避免过于频繁的请求
-      await Future.delayed(const Duration(milliseconds: 800));
-      
-      // 2. 获取公园 POI（景点相关）
-      debugPrint('正在获取公园 POI...');
-      try {
-        final parkResponse = await _apiService.searchPlaces(
-          q: '公园',
-          location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
-          radius: 15000, // 15公里范围
-          limit: 15, // 增加返回数量
-        );
-        allPois.addAll(parkResponse.results);
-        debugPrint('获取到 ${parkResponse.results.length} 个公园 POI');
-      } catch (e) {
-        debugPrint('获取公园 POI 失败: $e');
-      }
-      
-      // 添加请求间隔
-      await Future.delayed(const Duration(milliseconds: 800));
-      
-      // 3. 获取博物馆 POI（文化景点）
-      debugPrint('正在获取博物馆 POI...');
-      try {
-        final museumResponse = await _apiService.searchPlaces(
-          q: '博物馆',
-          location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
-          radius: 15000, // 15公里范围
-          limit: 10, // 增加返回数量
-        );
-        allPois.addAll(museumResponse.results);
-        debugPrint('获取到 ${museumResponse.results.length} 个博物馆 POI');
-      } catch (e) {
-        debugPrint('获取博物馆 POI 失败: $e');
-      }
-      
-      // 添加请求间隔
-      await Future.delayed(const Duration(milliseconds: 800));
-      
-      // 4. 获取历史建筑 POI（文化景点）
-      debugPrint('正在获取历史建筑 POI...');
-      try {
-        final historicResponse = await _apiService.searchPlaces(
-          q: '历史建筑',
-          location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
-          radius: 15000, // 15公里范围
-          limit: 10, // 增加返回数量
-        );
-        allPois.addAll(historicResponse.results);
-        debugPrint('获取到 ${historicResponse.results.length} 个历史建筑 POI');
-      } catch (e) {
-        debugPrint('获取历史建筑 POI 失败: $e');
-      }
-      
-      // 去重（基于 uid）
+      // 去重（基于 uid）+ 可选 UID 白名单过滤 + 关键词/别名过滤 + 地理距离容错（3km）
       final Map<String, Place> uniquePois = {};
       for (final poi in allPois) {
-        if (poi.uid.isNotEmpty && !uniquePois.containsKey(poi.uid)) {
+        if (poi.uid.isEmpty) continue;
+        if (hasSpecifiedUids && !BaiduMapConfig.specifiedPoiUids.contains(poi.uid)) continue;
+
+        bool match = true;
+        if (BaiduMapConfig.specifiedPoiKeywords.isNotEmpty) {
+          final name = poi.name;
+          match = BaiduMapConfig.specifiedPoiKeywords.any((k) => name.contains(k));
+          if (!match) {
+            // 别名匹配
+            for (final k in BaiduMapConfig.specifiedPoiKeywords) {
+              final aliasList = BaiduMapConfig.specifiedPoiAliases[k] ?? const [];
+              if (aliasList.any((a) => name.contains(a))) {
+                match = true;
+                break;
+              }
+            }
+          }
+          if (!match) {
+            // 地理距离容错：若与任一关键词的 geocode 坐标距离 < 3km 放行
+            // 由于此处 keywordLocations 在本作用域外，简化用当前地图中心位置做近邻判断兜底
+            final dKm = _haversineKm(_currentLocation!.latitude, _currentLocation!.longitude, poi.location.lat, poi.location.lng);
+            match = dKm <= 3.0;
+          }
+          if (!match) continue;
+        }
+
+        if (!uniquePois.containsKey(poi.uid)) {
           uniquePois[poi.uid] = poi;
         }
       }
       
+      // 严格精确匹配：按关键词挑选1个最匹配的结果，仅保留白名单数量
+      List<Place> finalPois = uniquePois.values.toList();
+      if (hasSpecifiedKeywords) {
+        final List<Place> selected = [];
+        for (final k in BaiduMapConfig.specifiedPoiKeywords) {
+          // 精确名称列表
+          final exactList = BaiduMapConfig.specifiedPoiExactNames[k] ?? const [];
+          final candidates = finalPois.where((p) {
+            if (exactList.isNotEmpty) {
+              return exactList.contains(p.name);
+            }
+            return p.name.contains(k);
+          }).toList();
+          if (candidates.isEmpty) continue;
+          // 选取距离当前关键词 geocode 位置最近的一个（此处退化为距离地图中心最近）
+          candidates.sort((a, b) {
+            final da = _haversineKm(_currentLocation!.latitude, _currentLocation!.longitude, a.location.lat, a.location.lng);
+            final db = _haversineKm(_currentLocation!.latitude, _currentLocation!.longitude, b.location.lat, b.location.lng);
+            return da.compareTo(db);
+          });
+          selected.add(candidates.first);
+        }
+        finalPois = selected;
+      }
+
       setState(() {
-        _nearbyPois = uniquePois.values.toList();
+        _nearbyPois = finalPois;
         _isLoadingPois = false;
       });
       
@@ -418,7 +575,60 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  // 计算两点间球面距离（公里）
+  double _haversineKm(double lat1, double lon1, double lat2, double lon2) {
+    const double r = 6371.0;
+    final double dLat = _deg2rad(lat2 - lat1);
+    final double dLon = _deg2rad(lon2 - lon1);
+    final double a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_deg2rad(lat1)) * math.cos(_deg2rad(lat2)) *
+            math.sin(dLon / 2) * math.sin(dLon / 2);
+    final double c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return r * c;
+  }
 
+  double _deg2rad(double deg) => deg * (math.pi / 180.0);
+
+  // 开始预加载POI数据
+  Future<void> _startPreloading() async {
+    if (_isPreloading || _hasPreloadedData) return;
+    
+    setState(() {
+      _isPreloading = true;
+    });
+    
+    try {
+      debugPrint('=== 开始预加载POI数据 ===');
+      
+      // 使用默认位置进行预加载
+      final defaultLat = BaiduMapConfig.defaultLatitude;
+      final defaultLng = BaiduMapConfig.defaultLongitude;
+      
+      final preloadedPois = await _apiService.preloadPoiData(
+        lat: defaultLat,
+        lng: defaultLng,
+      );
+      
+      setState(() {
+        _nearbyPois = preloadedPois;
+        _hasPreloadedData = true;
+        _isPreloading = false;
+      });
+      
+      debugPrint('预加载完成，获取到 ${preloadedPois.length} 个POI');
+      
+      // 如果地图已经准备好，立即显示POI标记
+      if (_mapController != null) {
+        _addPoiMarkers();
+      }
+      
+    } catch (e) {
+      debugPrint('预加载POI数据失败: $e');
+      setState(() {
+        _isPreloading = false;
+      });
+    }
+  }
 
   // 清除 POI 标记
   void _clearPoiMarkers() {
@@ -436,7 +646,7 @@ class _MapScreenState extends State<MapScreen> {
       _mapController!.updateMapOptions(
         BMFMapOptions(
           center: _currentLocation!,
-          zoomLevel: 15,
+          zoomLevel: 12, // 降低缩放级别，从15改为12，确保能看到更多POI
         ),
       );
     }
@@ -612,7 +822,7 @@ class _MapScreenState extends State<MapScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => WeatherDetailPage(
+          builder: (context) => WeatherDetailScreen(
             weatherData: weatherResponse,
             location: Location(
               lat: _currentLocation!.latitude,
@@ -706,69 +916,130 @@ class _MapScreenState extends State<MapScreen> {
     );
   }
 
+  Widget _buildActionButton({
+    required VoidCallback onPressed,
+    required IconData icon,
+    required bool isLoading,
+    required String tooltip,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(right: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: isLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : Icon(
+                    icon,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('地图'),
-        backgroundColor: Colors.black,
+        title: const Text(
+          '魔拍地图',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         foregroundColor: Colors.white,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Colors.black.withOpacity(0.8),
+                Colors.black.withOpacity(0.4),
+                Colors.transparent,
+              ],
+            ),
+          ),
+        ),
         actions: [
-          IconButton(
+          _buildActionButton(
             onPressed: _getWeatherInfo,
-            icon: _isLoadingWeather 
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.wb_sunny),
+            icon: Icons.wb_sunny_outlined,
+            isLoading: _isLoadingWeather,
             tooltip: '天气预报',
           ),
-          IconButton(
+          _buildActionButton(
             onPressed: _loadNearbyPois,
-            icon: _isLoadingPois 
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.location_on),
+            icon: Icons.location_on_outlined,
+            isLoading: _isLoadingPois,
             tooltip: '显示周围地点',
           ),
-          IconButton(
+          _buildActionButton(
             onPressed: _startLocation,
-            icon: _isLocating 
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.my_location),
+            icon: Icons.my_location_outlined,
+            isLoading: _isLocating,
             tooltip: '定位',
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // 搜索框
-          _buildSearchBar(),
-          
-          // 地图区域
-          Expanded(
-            child: _buildMapView(),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.blue[50]!,
+              Colors.white,
+            ],
           ),
-          
-          // 推荐项目
-          _buildRecommendItems(),
-        ],
+        ),
+        child: Column(
+          children: [
+            // 搜索框
+            _buildSearchBar(),
+            
+            // 地图区域
+            Expanded(
+              child: _buildMapView(),
+            ),
+            
+            // 推荐项目
+            _buildRecommendItems(),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildSearchBar() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 80, 16, 16), // 增加顶部padding为AppBar留空间
       child: Column(
         children: [
           // 搜索输入框
@@ -778,34 +1049,81 @@ class _MapScreenState extends State<MapScreen> {
                 child: Container(
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(25),
+                    borderRadius: BorderRadius.circular(30),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 4,
+                        color: Colors.black.withOpacity(0.08),
+                        blurRadius: 20,
+                        offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: Colors.blue.withOpacity(0.1),
+                        blurRadius: 10,
                         offset: const Offset(0, 2),
                       ),
                     ],
+                    border: Border.all(
+                      color: Colors.blue.withOpacity(0.1),
+                      width: 1,
+                    ),
                   ),
                   child: TextField(
                     controller: _searchController,
                     decoration: InputDecoration(
                       hintText: '搜索地点、地址或关键词...',
+                      hintStyle: TextStyle(
+                        color: Colors.grey[400],
+                        fontSize: 16,
+                      ),
                       border: InputBorder.none,
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      prefixIcon: Container(
+                        margin: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          Icons.search_rounded,
+                          color: Colors.blue[600],
+                          size: 20,
+                        ),
+                      ),
                       suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, color: Colors.grey),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {});
-                              },
+                          ? Container(
+                              margin: const EdgeInsets.all(8),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  onTap: () {
+                                    _searchController.clear();
+                                    setState(() {});
+                                  },
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[100],
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Icon(
+                                      Icons.clear_rounded,
+                                      color: Colors.grey[600],
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             )
                           : null,
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
-                        vertical: 12,
+                        vertical: 16,
                       ),
+                    ),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
                     ),
                     onChanged: (value) {
                       setState(() {});
@@ -818,70 +1136,112 @@ class _MapScreenState extends State<MapScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 12),
               Container(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(25),
+                  gradient: LinearGradient(
+                    colors: [Colors.blue[600]!, Colors.blue[400]!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(30),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
+                      color: Colors.blue.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
                     ),
                   ],
                 ),
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (_searchController.text.trim().isNotEmpty) {
-                      _searchPlaces(_searchController.text.trim());
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () {
+                      if (_searchController.text.trim().isNotEmpty) {
+                        _searchPlaces(_searchController.text.trim());
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(30),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.search_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          SizedBox(width: 8),
+                          Text(
+                            '搜索',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   ),
-                  child: const Text('搜索'),
                 ),
               ),
-
             ],
           ),
           
           // 搜索建议
           if (_searchController.text.isNotEmpty)
             Container(
-              margin: const EdgeInsets.only(top: 8),
-              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 15,
+                    offset: const Offset(0, 5),
                   ),
                 ],
+                border: Border.all(
+                  color: Colors.blue.withOpacity(0.1),
+                  width: 1,
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '搜索建议:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.grey,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          Icons.lightbulb_outline_rounded,
+                          color: Colors.blue[600],
+                          size: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '搜索建议',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
+                    spacing: 10,
+                    runSpacing: 10,
                     children: [
                       _buildSuggestionChip('${_searchController.text}附近'),
                       _buildSuggestionChip('${_searchController.text}美食'),
@@ -898,23 +1258,53 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Widget _buildSuggestionChip(String suggestion) {
-    return GestureDetector(
-      onTap: () {
-        _searchController.text = suggestion;
-        _searchPlaces(suggestion);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.blue[50],
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.blue[200]!),
-        ),
-        child: Text(
-          suggestion,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.blue[700],
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          _searchController.text = suggestion;
+          _searchPlaces(suggestion);
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.blue[50]!, Colors.blue[100]!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.blue[200]!,
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.search_rounded,
+                size: 14,
+                color: Colors.blue[600],
+              ),
+              const SizedBox(width: 6),
+              Text(
+                suggestion,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.blue[700],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -942,6 +1332,12 @@ class _MapScreenState extends State<MapScreen> {
             _mapController = controller;
             debugPrint('百度地图创建成功');
             _setupMapCallbacks();
+            
+            // 如果已有预加载数据，立即显示POI标记
+            if (_hasPreloadedData && _nearbyPois.isNotEmpty) {
+              debugPrint('地图创建完成，显示预加载的POI标记');
+              _addPoiMarkers();
+            }
           },
           mapOptions: _getMapOptions(),
         ),
@@ -992,7 +1388,7 @@ class _MapScreenState extends State<MapScreen> {
           ),
         
         // POI 加载状态指示器
-        if (_isLoadingPois)
+        if (_isLoadingPois || _isPreloading)
           Positioned(
             top: 16,
             left: 16,
@@ -1002,18 +1398,18 @@ class _MapScreenState extends State<MapScreen> {
                 color: Colors.black.withOpacity(0.7),
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  SizedBox(
+                  const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
-                    '加载周围地点...',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
+                    _isPreloading ? '加载地点数据...' : '加载周围地点...',
+                    style: const TextStyle(color: Colors.white, fontSize: 12),
                   ),
                 ],
               ),
@@ -1027,43 +1423,101 @@ class _MapScreenState extends State<MapScreen> {
             left: 16,
             right: 16,
             child: Container(
-              constraints: const BoxConstraints(maxHeight: 200),
+              constraints: const BoxConstraints(maxHeight: 220),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(8),
+                gradient: LinearGradient(
+                  colors: [Colors.white, Colors.blue[50]!],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: Colors.blue.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ],
+                border: Border.all(
+                  color: Colors.blue.withOpacity(0.1),
+                  width: 1,
+                ),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   // 统计信息行
                   Padding(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        const Icon(Icons.location_on, color: Colors.blue, size: 20),
-                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [Colors.blue[400]!, Colors.blue[600]!],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.location_on_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             '周围发现 ${_nearbyPois.length} 个地点',
-                            style: const TextStyle(fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                              color: Colors.black87,
+                            ),
                           ),
                         ),
-                        TextButton(
-                          onPressed: _clearPoiMarkers,
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: Size.zero,
-                          ),
-                          child: const Text(
-                            '清除标记',
-                            style: TextStyle(fontSize: 12, color: Colors.red),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _clearPoiMarkers,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: Colors.red[50],
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.red[200]!,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.clear_rounded,
+                                    size: 14,
+                                    color: Colors.red[600],
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '清除',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.red[600],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -1072,82 +1526,141 @@ class _MapScreenState extends State<MapScreen> {
                   
                   // POI 列表
                   SizedBox(
-                    height: 120,
+                    height: 140,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: _nearbyPois.length,
                       itemBuilder: (context, index) {
                         final poi = _nearbyPois[index];
-                        return GestureDetector(
-                          onTap: () {
-                            // 显示POI气泡
-                            _showPoiBubbleFromList(poi);
-                          },
-                          child: Container(
-                            width: 200,
-                            margin: const EdgeInsets.only(right: 8, bottom: 12),
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[50],
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.grey[200]!),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      _getPoiIconData(poi),
-                                      size: 16,
-                                      color: _getPoiIconColor(poi),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(
-                                        poi.name,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 14,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
+                        return Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () {
+                              // 显示POI气泡
+                              _showPoiBubbleFromList(poi);
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              width: 220,
+                              margin: const EdgeInsets.only(right: 12, bottom: 16),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [Colors.white, Colors.grey[50]!],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  poi.address,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: Colors.grey[200]!,
+                                  width: 1,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
                                   ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const Spacer(),
-                                Row(
-                                  children: [
-                                    if (poi.detailInfo.overallRating != '0') ...[
-                                      const Icon(Icons.star, size: 12, color: Colors.amber),
-                                      const SizedBox(width: 2),
-                                      Text(
-                                        poi.detailInfo.overallRating,
-                                        style: const TextStyle(fontSize: 10),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(6),
+                                        decoration: BoxDecoration(
+                                          color: _getPoiIconColor(poi).withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Icon(
+                                          _getPoiIconData(poi),
+                                          size: 16,
+                                          color: _getPoiIconColor(poi),
+                                        ),
                                       ),
                                       const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          poi.name,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                            color: Colors.black87,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                                     ],
-                                    const Icon(Icons.directions_walk, size: 12, color: Colors.blue),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      '${poi.detailInfo.distance}m',
-                                      style: const TextStyle(fontSize: 10),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    poi.address,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                      height: 1.3,
                                     ),
-                                  ],
-                                ),
-                              ],
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const Spacer(),
+                                  Row(
+                                    children: [
+                                      if (poi.detailInfo.overallRating != '0') ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.amber[100],
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.star_rounded, size: 12, color: Colors.amber),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                poi.detailInfo.overallRating,
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.amber[700],
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue[100],
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            const Icon(Icons.directions_walk_rounded, size: 12, color: Colors.blue),
+                                            const SizedBox(width: 2),
+                                            Text(
+                                              '${poi.detailInfo.distance}m',
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                color: Colors.blue[700],
+                                                fontWeight: FontWeight.w600,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -1164,45 +1677,82 @@ class _MapScreenState extends State<MapScreen> {
 
   Widget _buildRecommendItems() {
     return Container(
-      height: 100,
-      padding: const EdgeInsets.symmetric(vertical: 16),
+      height: 120,
+      padding: const EdgeInsets.symmetric(vertical: 20),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: _recommendItems.map((item) {
-          return GestureDetector(
-            onTap: () => _searchPlaces(item['keyword']),
-            child: Container(
-              width: 80,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withOpacity(0.3),
-                    spreadRadius: 1,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+          return Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _searchPlaces(item['keyword']),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 90,
+                height: 90,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.white, Colors.blue[50]!],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    item['icon'],
-                    size: 32,
-                    color: Colors.blue,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item['name'],
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.blue.withOpacity(0.1),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
                     ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.blue.withOpacity(0.1),
+                    width: 1,
                   ),
-                ],
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.blue[400]!, Colors.blue[600]!],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        item['icon'],
+                        size: 24,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      item['name'],
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue[700],
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -1259,8 +1809,8 @@ class _MapScreenState extends State<MapScreen> {
       );
     });
     
-    // 3秒后自动隐藏气泡
-    Future.delayed(const Duration(seconds: 3), () {
+    // 8秒后自动隐藏气泡，给用户更多时间查看详情
+    Future.delayed(const Duration(seconds: 8), () {
       if (mounted) {
         setState(() {
           _selectedPoi = null;
@@ -1287,68 +1837,127 @@ class _MapScreenState extends State<MapScreen> {
 
   // 构建POI气泡
   Widget _buildPoiBubble(Place poi) {
-    return GestureDetector(
-      onTap: () {
-        // 点击气泡跳转到详情页面
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PoiDetailScreen(poi: poi),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          // 点击气泡跳转到详情页面
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PoiDetailScreen(poi: poi),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(25),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 220),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Colors.white, Colors.blue[50]!],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(25),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.blue.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(
+              color: Colors.blue.withOpacity(0.2),
+              width: 1.5,
+            ),
           ),
-        );
-      },
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: Border.all(color: Colors.blue.withOpacity(0.3), width: 1),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 气泡内容
-            Text(
-              poi.name,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Colors.black87,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 气泡内容
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue[400]!, Colors.blue[600]!],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      _getPoiIconData(poi),
+                      size: 16,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      poi.name,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.black87,
+                      ),
+                      textAlign: TextAlign.center,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
               ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '点击查看详情',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.blue.withOpacity(0.7),
-              ),
-            ),
-            const SizedBox(height: 4),
-            // 小三角形指示器
-            Container(
-              width: 0,
-              height: 0,
-              decoration: const BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: Colors.transparent, width: 8),
-                  right: BorderSide(color: Colors.transparent, width: 8),
-                  top: BorderSide(color: Colors.white, width: 8),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.blue[100],
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.touch_app_rounded,
+                      size: 12,
+                      color: Colors.blue[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '点击查看详情',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.blue[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 8),
+              // 小三角形指示器
+              Container(
+                width: 0,
+                height: 0,
+                decoration: BoxDecoration(
+                  border: Border(
+                    left: BorderSide(color: Colors.transparent, width: 10),
+                    right: BorderSide(color: Colors.transparent, width: 10),
+                    top: BorderSide(color: Colors.white, width: 10),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1363,7 +1972,7 @@ class _MapScreenState extends State<MapScreen> {
     
     return BMFMapOptions(
       mapType: _mapType,
-      zoomLevel: 15,
+      zoomLevel: 12, // 降低缩放级别，从15改为12，确保能看到更多POI
       maxZoomLevel: 21,
       minZoomLevel: 4,
       backgroundColor: Colors.blue,
@@ -1537,342 +2146,6 @@ class _MapSearchResultViewState extends State<MapSearchResultView> {
   }
 }
 
-// 天气详情页面
-class WeatherDetailPage extends StatelessWidget {
-  final WeatherResponse weatherData;
-  final Location location;
-
-  const WeatherDetailPage({
-    super.key,
-    required this.weatherData,
-    required this.location,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('天气预报'),
-        backgroundColor: Colors.black,
-        foregroundColor: Colors.white,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildWeatherCard(),
-            const SizedBox(height: 16),
-            _buildLocationInfo(),
-            const SizedBox(height: 16),
-            _buildLifeIndexes(),
-            const SizedBox(height: 16),
-            _buildWeatherDetails(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWeatherCard() {
-    final now = weatherData.result.now;
-    final location = weatherData.result.location;
-    
-    debugPrint('天气详情页面 - 当前天气数据:');
-    debugPrint('  温度: ${now.temp}°C');
-    debugPrint('  天气: ${now.text}');
-    debugPrint('  湿度: ${now.rh}%');
-    debugPrint('  风速: ${now.windClass}');
-    debugPrint('  风向: ${now.windDir}');
-    debugPrint('  体感温度: ${now.feelsLike}°C');
-    debugPrint('  空气质量: ${now.aqi}');
-
-    return Card(
-      elevation: 8,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF4A90E2), Color(0xFF357ABD)],
-          ),
-        ),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      now.text,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${location.city} ${location.name}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white.withOpacity(0.8),
-                      ),
-                    ),
-                  ],
-                ),
-                Icon(
-                  _getWeatherIcon(now.text),
-                  size: 64,
-                  color: Colors.white,
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '${now.temp}°',
-                  style: const TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const Text(
-                  'C',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildWeatherInfo('湿度', '${now.rh}%', Icons.water_drop),
-                _buildWeatherInfo('风速', now.windClass, Icons.air),
-                _buildWeatherInfo('风向', now.windDir, Icons.compass_calibration),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocationInfo() {
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            const Icon(Icons.location_on, color: Colors.red, size: 24),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    '当前位置',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '纬度: ${location.lat.toStringAsFixed(4)}, 经度: ${location.lng.toStringAsFixed(4)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLifeIndexes() {
-    final indexes = weatherData.result.indexes;
-    
-    if (indexes.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '生活指数',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...indexes.take(6).map((index) => _buildIndexItem(index)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildIndexItem(WeatherIndex index) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              index.name,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              index.brief,
-              style: const TextStyle(color: Colors.blue),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeatherDetails() {
-    final forecasts = weatherData.result.forecasts;
-    
-    debugPrint('天气详情页面 - 预报数据: $forecasts');
-    debugPrint('天气详情页面 - 预报数据长度: ${forecasts.length}');
-
-    return Card(
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              '未来天气预报',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            if (forecasts.isNotEmpty)
-              ...forecasts.take(7).map((day) => _buildForecastItem(day))
-            else
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text(
-                  '暂无预报数据',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildForecastItem(WeatherForecast day) {
-    final date = day.date;
-    final weather = day.text;
-    final high = day.high;
-    final low = day.low;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 2,
-            child: Text(
-              date,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                Icon(_getWeatherIcon(weather), size: 20, color: Colors.blue),
-                const SizedBox(width: 8),
-                Text(weather),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              '$low° - $high°',
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeatherInfo(String label, String value, IconData icon) {
-    return Column(
-      children: [
-        Icon(icon, color: Colors.white, size: 24),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.white.withOpacity(0.8),
-          ),
-        ),
-      ],
-    );
-  }
-
-  IconData _getWeatherIcon(String weather) {
-    if (weather.contains('晴')) return Icons.wb_sunny;
-    if (weather.contains('多云')) return Icons.cloud;
-    if (weather.contains('阴')) return Icons.cloud_queue;
-    if (weather.contains('雨')) return Icons.umbrella;
-    if (weather.contains('雪')) return Icons.ac_unit;
-    if (weather.contains('雾')) return Icons.cloud;
-    return Icons.wb_sunny;
-  }
-}
 
 // 搜索结果页面
 class SearchResultPage extends StatelessWidget {
