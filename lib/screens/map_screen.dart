@@ -1,15 +1,14 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_baidu_mapapi_map/flutter_baidu_mapapi_map.dart';
 import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../config/baidu_map_config.dart';
-import '../config/api_config.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
 import '../widgets/recommendation_bubble.dart';
+import 'poi_detail_screen.dart';
 
 class MapScreen extends StatefulWidget {
   const MapScreen({super.key});
@@ -30,11 +29,20 @@ class _MapScreenState extends State<MapScreen> {
   
   // 天气相关
   bool _isLoadingWeather = false;
-  WeatherResponse? _weatherData;
   
   // 搜索相关
   final TextEditingController _searchController = TextEditingController();
   final ApiService _apiService = ApiService();
+  
+  // POI 标记相关
+  List<BMFMarker> _poiMarkers = [];
+  bool _isLoadingPois = false;
+  List<Place> _nearbyPois = [];
+  
+  // POI 气泡相关
+  Place? _selectedPoi;
+  Offset? _bubblePosition;
+  
   
   // 推荐项目
   final List<Map<String, dynamic>> _recommendItems = [
@@ -154,6 +162,10 @@ class _MapScreenState extends State<MapScreen> {
       // 显示推荐气泡
       _showRecommendationBubble();
       
+      debugPrint('开始加载周围 POI...');
+      // 加载周围 POI 并在地图上标记
+      _loadNearbyPois();
+      
       debugPrint('=== 定位流程完成 ===');
     } catch (e) {
       debugPrint('开始定位失败: $e');
@@ -189,6 +201,233 @@ class _MapScreenState extends State<MapScreen> {
       ),
     );
     debugPrint('推荐气泡已显示');
+  }
+
+  // 获取周围 POI 列表
+  Future<void> _loadNearbyPois() async {
+    if (_currentLocation == null || _mapController == null) {
+      debugPrint('当前位置或地图控制器为空，无法加载 POI');
+      return;
+    }
+
+    setState(() {
+      _isLoadingPois = true;
+    });
+
+    try {
+      debugPrint('=== 开始加载周围 POI ===');
+      debugPrint('当前位置: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
+      
+      // 只获取景点类型的 POI，过滤掉美食
+      final List<Place> allPois = [];
+      
+      // 1. 获取景点 POI（主要类型）
+      debugPrint('正在获取景点 POI...');
+      try {
+        final attractionResponse = await _apiService.searchPlaces(
+          q: '景点',
+          location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
+          radius: 15000, // 扩大搜索范围到15公里
+          limit: 20, // 增加返回数量
+        );
+        allPois.addAll(attractionResponse.results);
+        debugPrint('获取到 ${attractionResponse.results.length} 个景点 POI');
+      } catch (e) {
+        debugPrint('获取景点 POI 失败: $e');
+      }
+      
+      // 添加请求间隔，避免过于频繁的请求
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // 2. 获取公园 POI（景点相关）
+      debugPrint('正在获取公园 POI...');
+      try {
+        final parkResponse = await _apiService.searchPlaces(
+          q: '公园',
+          location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
+          radius: 15000, // 15公里范围
+          limit: 15, // 增加返回数量
+        );
+        allPois.addAll(parkResponse.results);
+        debugPrint('获取到 ${parkResponse.results.length} 个公园 POI');
+      } catch (e) {
+        debugPrint('获取公园 POI 失败: $e');
+      }
+      
+      // 添加请求间隔
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // 3. 获取博物馆 POI（文化景点）
+      debugPrint('正在获取博物馆 POI...');
+      try {
+        final museumResponse = await _apiService.searchPlaces(
+          q: '博物馆',
+          location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
+          radius: 15000, // 15公里范围
+          limit: 10, // 增加返回数量
+        );
+        allPois.addAll(museumResponse.results);
+        debugPrint('获取到 ${museumResponse.results.length} 个博物馆 POI');
+      } catch (e) {
+        debugPrint('获取博物馆 POI 失败: $e');
+      }
+      
+      // 添加请求间隔
+      await Future.delayed(const Duration(milliseconds: 800));
+      
+      // 4. 获取历史建筑 POI（文化景点）
+      debugPrint('正在获取历史建筑 POI...');
+      try {
+        final historicResponse = await _apiService.searchPlaces(
+          q: '历史建筑',
+          location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
+          radius: 15000, // 15公里范围
+          limit: 10, // 增加返回数量
+        );
+        allPois.addAll(historicResponse.results);
+        debugPrint('获取到 ${historicResponse.results.length} 个历史建筑 POI');
+      } catch (e) {
+        debugPrint('获取历史建筑 POI 失败: $e');
+      }
+      
+      // 去重（基于 uid）
+      final Map<String, Place> uniquePois = {};
+      for (final poi in allPois) {
+        if (poi.uid.isNotEmpty && !uniquePois.containsKey(poi.uid)) {
+          uniquePois[poi.uid] = poi;
+        }
+      }
+      
+      setState(() {
+        _nearbyPois = uniquePois.values.toList();
+        _isLoadingPois = false;
+      });
+      
+      debugPrint('获取到 ${_nearbyPois.length} 个景点 POI');
+      debugPrint('POI 详情: ${_nearbyPois.map((p) => '${p.name} (${p.location.lat}, ${p.location.lng})').toList()}');
+      
+      // 在地图上添加标记
+      _addPoiMarkers();
+      
+    } catch (e) {
+      debugPrint('获取周围 POI 失败: $e');
+      setState(() {
+        _isLoadingPois = false;
+      });
+      _showSnackBar('获取周围地点失败: $e');
+    }
+  }
+
+  // 在地图上添加 POI 标记
+  void _addPoiMarkers() {
+    if (_mapController == null) {
+      debugPrint('地图控制器为空，无法添加 POI 标记');
+      return;
+    }
+
+    if (_nearbyPois.isEmpty) {
+      debugPrint('POI 列表为空，无法添加标记');
+      return;
+    }
+
+    debugPrint('开始添加 POI 标记，共 ${_nearbyPois.length} 个 POI');
+
+    // 清除现有标记
+    _clearPoiMarkers();
+
+    _poiMarkers.clear();
+    
+    for (int i = 0; i < _nearbyPois.length; i++) {
+      final poi = _nearbyPois[i];
+      final iconType = _getPoiIcon(poi);
+      
+      debugPrint('添加标记 $i: ${poi.name} 位置: (${poi.location.lat}, ${poi.location.lng}) 类型: $iconType');
+      
+      // 使用 BMFMarker 的默认构造函数，使用系统默认图标
+      final marker = BMFMarker(
+        position: BMFCoordinate(
+          poi.location.lat,
+          poi.location.lng,
+        ),
+        title: poi.name,
+        subtitle: poi.address,
+        identifier: poi.uid.isNotEmpty ? poi.uid : 'poi_$i', // 添加唯一标识符
+      );
+      
+      _poiMarkers.add(marker);
+      _mapController!.addMarker(marker);
+      
+      debugPrint('标记 $i 已添加到地图');
+    }
+    
+    debugPrint('已添加 ${_poiMarkers.length} 个 POI 标记到地图');
+  }
+
+  // 根据 POI 类型获取图标
+  String _getPoiIcon(Place poi) {
+    // 使用 Flutter 自带的图标，通过图标名称返回
+    final category = poi.detailInfo.classifiedPoiTag.toLowerCase();
+    final name = poi.name.toLowerCase();
+    
+    if (category.contains('餐饮') || name.contains('餐厅') || name.contains('美食') || name.contains('饭店')) {
+      return 'restaurant'; // 美食图标
+    } else if (category.contains('旅游') || name.contains('景点') || name.contains('公园') || name.contains('博物馆')) {
+      return 'attractions'; // 景点图标
+    } else if (category.contains('娱乐') || name.contains('KTV') || name.contains('电影院') || name.contains('游戏')) {
+      return 'sports_esports'; // 娱乐图标
+    } else if (category.contains('购物') || name.contains('商场') || name.contains('超市') || name.contains('商店')) {
+      return 'shopping_cart'; // 购物图标
+    } else {
+      return 'location_on'; // 默认位置图标
+    }
+  }
+
+  // 根据 POI 类型获取图标数据
+  IconData _getPoiIconData(Place poi) {
+    final category = poi.detailInfo.classifiedPoiTag.toLowerCase();
+    final name = poi.name.toLowerCase();
+    
+    if (category.contains('餐饮') || name.contains('餐厅') || name.contains('美食') || name.contains('饭店')) {
+      return Icons.restaurant;
+    } else if (category.contains('旅游') || name.contains('景点') || name.contains('公园') || name.contains('博物馆')) {
+      return Icons.attractions;
+    } else if (category.contains('娱乐') || name.contains('KTV') || name.contains('电影院') || name.contains('游戏')) {
+      return Icons.sports_esports;
+    } else if (category.contains('购物') || name.contains('商场') || name.contains('超市') || name.contains('商店')) {
+      return Icons.shopping_cart;
+    } else {
+      return Icons.location_on;
+    }
+  }
+
+  // 根据 POI 类型获取图标颜色
+  Color _getPoiIconColor(Place poi) {
+    final category = poi.detailInfo.classifiedPoiTag.toLowerCase();
+    final name = poi.name.toLowerCase();
+    
+    if (category.contains('餐饮') || name.contains('餐厅') || name.contains('美食') || name.contains('饭店')) {
+      return Colors.red;
+    } else if (category.contains('旅游') || name.contains('景点') || name.contains('公园') || name.contains('博物馆')) {
+      return Colors.green;
+    } else if (category.contains('娱乐') || name.contains('KTV') || name.contains('电影院') || name.contains('游戏')) {
+      return Colors.purple;
+    } else if (category.contains('购物') || name.contains('商场') || name.contains('超市') || name.contains('商店')) {
+      return Colors.orange;
+    } else {
+      return Colors.blue;
+    }
+  }
+
+
+
+  // 清除 POI 标记
+  void _clearPoiMarkers() {
+    if (_mapController == null) return;
+    
+    for (final marker in _poiMarkers) {
+      _mapController!.removeMarker(marker);
+    }
+    _poiMarkers.clear();
   }
 
   // 更新地图到当前位置
@@ -362,7 +601,6 @@ class _MapScreenState extends State<MapScreen> {
       );
       
       setState(() {
-        _weatherData = weatherResponse;
         _isLoadingWeather = false;
       });
       
@@ -486,6 +724,17 @@ class _MapScreenState extends State<MapScreen> {
                 )
               : const Icon(Icons.wb_sunny),
             tooltip: '天气预报',
+          ),
+          IconButton(
+            onPressed: _loadNearbyPois,
+            icon: _isLoadingPois 
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.location_on),
+            tooltip: '显示周围地点',
           ),
           IconButton(
             onPressed: _startLocation,
@@ -696,6 +945,23 @@ class _MapScreenState extends State<MapScreen> {
           },
           mapOptions: _getMapOptions(),
         ),
+        
+        // POI 气泡显示
+        if (_selectedPoi != null && _bubblePosition != null)
+          Positioned(
+            left: _bubblePosition!.dx.clamp(10.0, MediaQuery.of(context).size.width - 210),
+            top: _bubblePosition!.dy.clamp(10.0, MediaQuery.of(context).size.height - 100),
+            child: GestureDetector(
+              onTap: () {
+                // 点击气泡可以关闭
+                setState(() {
+                  _selectedPoi = null;
+                  _bubblePosition = null;
+                });
+              },
+              child: _buildPoiBubble(_selectedPoi!),
+            ),
+          ),
         // 定位状态指示器
         if (_isLocating)
           Positioned(
@@ -719,6 +985,174 @@ class _MapScreenState extends State<MapScreen> {
                   Text(
                     '定位中...',
                     style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        
+        // POI 加载状态指示器
+        if (_isLoadingPois)
+          Positioned(
+            top: 16,
+            left: 16,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    '加载周围地点...',
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        
+        // POI 统计信息和列表
+        if (_nearbyPois.isNotEmpty && !_isLoadingPois)
+          Positioned(
+            bottom: 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 统计信息行
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on, color: Colors.blue, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '周围发现 ${_nearbyPois.length} 个地点',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _clearPoiMarkers,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            minimumSize: Size.zero,
+                          ),
+                          child: const Text(
+                            '清除标记',
+                            style: TextStyle(fontSize: 12, color: Colors.red),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // POI 列表
+                  SizedBox(
+                    height: 120,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      itemCount: _nearbyPois.length,
+                      itemBuilder: (context, index) {
+                        final poi = _nearbyPois[index];
+                        return GestureDetector(
+                          onTap: () {
+                            // 显示POI气泡
+                            _showPoiBubbleFromList(poi);
+                          },
+                          child: Container(
+                            width: 200,
+                            margin: const EdgeInsets.only(right: 8, bottom: 12),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[50],
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey[200]!),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      _getPoiIconData(poi),
+                                      size: 16,
+                                      color: _getPoiIconColor(poi),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Expanded(
+                                      child: Text(
+                                        poi.name,
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  poi.address,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const Spacer(),
+                                Row(
+                                  children: [
+                                    if (poi.detailInfo.overallRating != '0') ...[
+                                      const Icon(Icons.star, size: 12, color: Colors.amber),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        poi.detailInfo.overallRating,
+                                        style: const TextStyle(fontSize: 10),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+                                    const Icon(Icons.directions_walk, size: 12, color: Colors.blue),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${poi.detailInfo.distance}m',
+                                      style: const TextStyle(fontSize: 10),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -797,6 +1231,127 @@ class _MapScreenState extends State<MapScreen> {
         callback: (BMFMapStatus mapStatus) {
       debugPrint('地图区域改变完成: ${mapStatus.toMap()}');
     });
+
+    // 设置地图点击回调 - 暂时注释，使用备用方案
+    // _mapController!.setMapOnTapCallback(
+    //     (BMFCoordinate coordinate) {
+    //   debugPrint('地图被点击: ${coordinate.latitude}, ${coordinate.longitude}');
+    //   _handleMapClick(coordinate);
+    // });
+
+    debugPrint('地图回调设置完成');
+  }
+
+  
+  
+
+  
+  
+  
+  // 显示POI名字气泡
+  void _showPoiName(Place poi, Offset screenPosition) {
+    setState(() {
+      _selectedPoi = poi;
+      // 计算气泡位置（在标记位置上方，并考虑气泡大小）
+      _bubblePosition = Offset(
+        screenPosition.dx - 100, // 气泡宽度的一半，使其居中
+        screenPosition.dy - 60,  // 在标记上方60像素
+      );
+    });
+    
+    // 3秒后自动隐藏气泡
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _selectedPoi = null;
+          _bubblePosition = null;
+        });
+      }
+    });
+  }
+
+  // 从POI列表显示气泡
+  void _showPoiBubbleFromList(Place poi) {
+    if (_mapController == null) return;
+    
+    // 将POI的地图坐标转换为屏幕坐标
+    _mapController!.convertCoordinateToScreenPoint(
+      BMFCoordinate(poi.location.lat, poi.location.lng),
+    ).then((BMFPoint? screenPoint) {
+      if (screenPoint != null) {
+        debugPrint('POI列表点击 - 屏幕坐标: $screenPoint');
+        _showPoiName(poi, Offset(screenPoint.x, screenPoint.y));
+      }
+    });
+  }
+
+  // 构建POI气泡
+  Widget _buildPoiBubble(Place poi) {
+    return GestureDetector(
+      onTap: () {
+        // 点击气泡跳转到详情页面
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PoiDetailScreen(poi: poi),
+          ),
+        );
+      },
+      child: Container(
+        constraints: const BoxConstraints(maxWidth: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(color: Colors.blue.withOpacity(0.3), width: 1),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 气泡内容
+            Text(
+              poi.name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Colors.black87,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '点击查看详情',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.blue.withOpacity(0.7),
+              ),
+            ),
+            const SizedBox(height: 4),
+            // 小三角形指示器
+            Container(
+              width: 0,
+              height: 0,
+              decoration: const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: Colors.transparent, width: 8),
+                  right: BorderSide(color: Colors.transparent, width: 8),
+                  top: BorderSide(color: Colors.white, width: 8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   BMFMapOptions _getMapOptions() {
@@ -877,27 +1432,27 @@ class _MapSearchResultViewState extends State<MapSearchResultView> {
     _markers.clear();
     
     // 添加中心点标记
-    final centerMarker = BMFMarker(
+    final centerMarker = BMFMarker.icon(
       position: BMFCoordinate(
         widget.centerLocation.lat,
         widget.centerLocation.lng,
       ),
       title: '搜索中心',
-      icon: 'assets/logo.png',
+      icon: 'assets/logo.jpeg',
     );
     _markers.add(centerMarker);
 
     // 添加搜索结果标记
     for (int i = 0; i < widget.places.length; i++) {
       final place = widget.places[i];
-      final marker = BMFMarker(
+      final marker = BMFMarker.icon(
         position: BMFCoordinate(
           place.location.lat,
           place.location.lng,
         ),
         title: place.name,
         subtitle: place.address,
-        icon: 'assets/logo.png',
+        icon: 'assets/logo.jpeg',
       );
       _markers.add(marker);
     }

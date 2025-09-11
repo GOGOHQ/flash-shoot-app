@@ -344,7 +344,7 @@ imageUrl: "https://example.com/images/photo3.jpg",
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     child: Text(
                       _mainTabs[index],
                       style: TextStyle(
@@ -369,7 +369,7 @@ imageUrl: "https://example.com/images/photo3.jpg",
         ),
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
-          child: Image.asset("assets/logo.png"),
+          child: Image.asset("assets/logo.jpeg"),
         ),
         actions: [
           IconButton(

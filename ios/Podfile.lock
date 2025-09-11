@@ -106,7 +106,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   BaiduMapKit: 84991811cb07b24c6ead7d59022c13245427782c
   BMKLocationKit: 79689c9898474cbad4a93a5f0cc06c8c97fa2b02
-  camera_avfoundation: adb0207d868b2d873e895371d88448399ab78d87
+  camera_avfoundation: be3be85408cd4126f250386828e9b1dfa40ab436
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_baidu_mapapi_base: b64ee8ed2c189b06ac50c96df1b4d0d6e58b8690
   flutter_baidu_mapapi_map: 2f85b973826c694abfc3a3f9d89fb1ebe0d6d0a3
