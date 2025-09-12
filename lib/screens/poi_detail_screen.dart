@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:map_launcher/map_launcher.dart';
 import '../models/api_models.dart';
 import '../models/poi_content_model.dart';
 import '../services/api_service.dart';
@@ -74,6 +75,140 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
           SnackBar(content: Text('获取天气信息失败: $e')),
         );
       }
+    }
+  }
+
+  // 打开导航
+  void _openNavigation() async {
+    try {
+      // 检查可用的地图应用
+      final availableMaps = <MapType>[];
+      
+      // 检查各种地图应用是否可用
+      if (await MapLauncher.isMapAvailable(MapType.google) == true) {
+        availableMaps.add(MapType.google);
+      }
+      if (await MapLauncher.isMapAvailable(MapType.apple) == true) {
+        availableMaps.add(MapType.apple);
+      }
+      if (await MapLauncher.isMapAvailable(MapType.amap) == true) {
+        availableMaps.add(MapType.amap);
+      }
+      if (await MapLauncher.isMapAvailable(MapType.baidu) == true) {
+        availableMaps.add(MapType.baidu);
+      }
+      if (await MapLauncher.isMapAvailable(MapType.tencent) == true) {
+        availableMaps.add(MapType.tencent);
+      }
+      
+      if (availableMaps.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未找到可用的地图应用')),
+        );
+        return;
+      }
+
+      // 显示地图选择弹窗
+      showModalBottomSheet(
+        context: context,
+        builder: (BuildContext context) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '选择导航应用',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...availableMaps.map((mapType) {
+                  return ListTile(
+                    leading: Icon(_getMapIcon(mapType)),
+                    title: Text(_getMapName(mapType)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _launchMap(mapType);
+                    },
+                  );
+                }).toList(),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('启动导航失败: $e')),
+      );
+    }
+  }
+
+  Future<void> _launchMap(MapType mapType) async {
+    try {
+      await MapLauncher.showDirections(
+        mapType: mapType,
+        destination: Coords(widget.poi.location.lat, widget.poi.location.lng),
+        destinationTitle: widget.poi.name,
+      );
+    } catch (e) {
+      // 如果导航失败，尝试显示标记
+      try {
+        await MapLauncher.showMarker(
+          mapType: mapType,
+          coords: Coords(widget.poi.location.lat, widget.poi.location.lng),
+          title: widget.poi.name,
+          description: widget.poi.address,
+        );
+      } catch (e2) {
+        throw Exception('无法启动地图应用: $e2');
+      }
+    }
+  }
+
+  IconData _getMapIcon(MapType mapType) {
+    switch (mapType) {
+      case MapType.google:
+        return Icons.map;
+      case MapType.apple:
+        return Icons.apple;
+      case MapType.amap:
+        return Icons.navigation;
+      case MapType.baidu:
+        return Icons.location_on;
+      case MapType.tencent:
+        return Icons.place;
+      default:
+        return Icons.map;
+    }
+  }
+
+  String _getMapName(MapType mapType) {
+    switch (mapType) {
+      case MapType.google:
+        return 'Google 地图';
+      case MapType.apple:
+        return '苹果地图';
+      case MapType.amap:
+        return '高德地图';
+      case MapType.baidu:
+        return '百度地图';
+      case MapType.tencent:
+        return '腾讯地图';
+      default:
+        return '地图应用';
     }
   }
 
@@ -363,60 +498,125 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
             
             const SizedBox(height: 12),
             
-            // 天气查询按钮
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.blue[500]!, Colors.blue[600]!],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withOpacity(0.3),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _getWeatherInfo,
-                  borderRadius: BorderRadius.circular(16),
+            // 查询天气和导航按钮（同一行）
+            Row(
+              children: [
+                // 天气查询按钮
+                Expanded(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.wb_sunny_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        const Text(
-                          '查询天气',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue[500]!, Colors.blue[600]!],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.blue.withOpacity(0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _getWeatherInfo,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.wb_sunny_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                '查询天气',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                
+                const SizedBox(width: 12),
+                
+                // 导航按钮
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.green[500]!, Colors.green[600]!],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.green.withOpacity(0.3),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _openNavigation,
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.navigation_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                '开始导航',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

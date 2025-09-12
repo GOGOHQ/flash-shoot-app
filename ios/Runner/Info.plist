@@ -24,6 +24,14 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>iosamap</string>
+		<string>baidumap</string>
+		<string>qqmap</string>
+		<string>maps</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppTransportSecurity</key>
@@ -32,7 +40,6 @@
 		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
-		<!-- 白名单IP-->
 			<key>172.21.222.203</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>

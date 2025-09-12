@@ -4,6 +4,7 @@ import 'package:flutter_baidu_mapapi_map/flutter_baidu_mapapi_map.dart';
 import 'package:flutter_baidu_mapapi_base/flutter_baidu_mapapi_base.dart';
 import 'package:flutter_bmflocation/flutter_bmflocation.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:map_launcher/map_launcher.dart';
 import '../config/baidu_map_config.dart';
 import '../services/api_service.dart';
 import '../models/api_models.dart';
@@ -649,6 +650,56 @@ class _MapScreenState extends State<MapScreen> {
           zoomLevel: 12, // 降低缩放级别，从15改为12，确保能看到更多POI
         ),
       );
+    }
+  }
+
+  // 搜索附近地点
+  Future<void> _searchNearbyPlaces(String keyword) async {
+    if (_currentLocation == null) {
+      _showSnackBar('正在获取位置信息，请稍后再试');
+      return;
+    }
+
+    try {
+      setState(() {
+        _isLoadingPois = true;
+      });
+
+      debugPrint('搜索附近 $keyword: ${_currentLocation!.latitude}, ${_currentLocation!.longitude}');
+      
+      // 使用当前位置搜索附近的地点
+      final places = await _apiService.searchPlaces(
+        q: keyword,
+        location: '${_currentLocation!.latitude},${_currentLocation!.longitude}',
+        radius: 3000, // 3公里范围内搜索
+        limit: 20,
+      );
+
+      if (places.results.isEmpty) {
+        _showSnackBar('附近暂无$keyword');
+        return;
+      }
+
+      // 清空现有标记
+      _clearPoiMarkers();
+      
+      // 更新POI列表
+      setState(() {
+        _nearbyPois = places.results;
+        _isLoadingPois = false;
+      });
+
+      // 在地图上添加标记
+      _addPoiMarkers();
+
+      _showSnackBar('找到 ${places.results.length} 个附近$keyword');
+      
+    } catch (e) {
+      debugPrint('搜索附近$keyword失败: $e');
+      _showSnackBar('搜索失败，请重试');
+      setState(() {
+        _isLoadingPois = false;
+      });
     }
   }
 
@@ -1685,7 +1736,7 @@ class _MapScreenState extends State<MapScreen> {
           return Material(
             color: Colors.transparent,
             child: InkWell(
-              onTap: () => _searchPlaces(item['keyword']),
+              onTap: () => _searchNearbyPlaces(item['keyword']),
               borderRadius: BorderRadius.circular(20),
               child: Container(
                 width: 90,
@@ -2491,11 +2542,137 @@ class SearchResultPage extends StatelessWidget {
     );
   }
 
-  void _openNavigation(BuildContext context, Place place) {
-    // 这里可以集成第三方导航应用
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('导航功能开发中...')),
-    );
+  void _openNavigation(BuildContext context, Place place) async {
+    try {
+      // 检查可用的地图应用
+      final availableMaps = <MapType>[];
+      
+      // 检查各种地图应用是否可用
+      if (await MapLauncher.isMapAvailable(MapType.google) == true) {
+        availableMaps.add(MapType.google);
+      }
+      if (await MapLauncher.isMapAvailable(MapType.apple) == true) {
+        availableMaps.add(MapType.apple);
+      }
+      if (await MapLauncher.isMapAvailable(MapType.amap) == true) {
+        availableMaps.add(MapType.amap);
+      }
+      if (await MapLauncher.isMapAvailable(MapType.baidu) == true) {
+        availableMaps.add(MapType.baidu);
+      }
+      if (await MapLauncher.isMapAvailable(MapType.tencent) == true) {
+        availableMaps.add(MapType.tencent);
+      }
+      
+      if (availableMaps.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('未找到可用的地图应用')),
+        );
+        return;
+      }
+
+      // 显示地图选择弹窗
+      showModalBottomSheet(
+        context: context,
+        builder: (BuildContext context) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '选择导航应用',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ...availableMaps.map((mapType) {
+                  return ListTile(
+                    leading: Icon(_getMapIcon(mapType)),
+                    title: Text(_getMapName(mapType)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await _launchMap(mapType, place);
+                    },
+                  );
+                }).toList(),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('取消'),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('启动导航失败: $e')),
+      );
+    }
+  }
+
+  Future<void> _launchMap(MapType mapType, Place place) async {
+    try {
+      await MapLauncher.showDirections(
+        mapType: mapType,
+        destination: Coords(place.location.lat, place.location.lng),
+        destinationTitle: place.name,
+      );
+    } catch (e) {
+      // 如果导航失败，尝试显示标记
+      try {
+        await MapLauncher.showMarker(
+          mapType: mapType,
+          coords: Coords(place.location.lat, place.location.lng),
+          title: place.name,
+          description: place.address,
+        );
+      } catch (e2) {
+        throw Exception('无法启动地图应用: $e2');
+      }
+    }
+  }
+
+  IconData _getMapIcon(MapType mapType) {
+    switch (mapType) {
+      case MapType.google:
+        return Icons.map;
+      case MapType.apple:
+        return Icons.apple;
+      case MapType.amap:
+        return Icons.navigation;
+      case MapType.baidu:
+        return Icons.location_on;
+      case MapType.tencent:
+        return Icons.place;
+      default:
+        return Icons.map;
+    }
+  }
+
+  String _getMapName(MapType mapType) {
+    switch (mapType) {
+      case MapType.google:
+        return 'Google 地图';
+      case MapType.apple:
+        return '苹果地图';
+      case MapType.amap:
+        return '高德地图';
+      case MapType.baidu:
+        return '百度地图';
+      case MapType.tencent:
+        return '腾讯地图';
+      default:
+        return '地图应用';
+    }
   }
 
   void _sharePlace(BuildContext context, Place place) {
