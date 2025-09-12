@@ -37,14 +37,26 @@ ark_client = Ark(base_url=ARK_BASE_URL, api_key=API_KEY)
 
 
 def make_background_transparent(input_path, output_path, threshold=200):
-    """把白色背景变透明并保存为 PNG"""
+    """
+    把白色背景变透明，并保存为压缩 PNG。
+    优化：
+      - 自动优化颜色索引（optimize=True）
+      - 转调色板模式（P 模式）减少颜色通道
+      - 保留透明度
+    """
     img = Image.open(input_path).convert("RGBA")
     data = np.array(img)
     r, g, b, a = data.T
+    # 将接近白色的区域透明化
     white_areas = (r > threshold) & (g > threshold) & (b > threshold)
     data[..., -1][white_areas.T] = 0
-    transparent_img = Image.fromarray(data)
-    transparent_img.save(output_path, "PNG")
+
+    img = Image.fromarray(data)
+
+    # 转调色板模式，保持透明度，减少文件大小
+    img = img.convert("P", palette=Image.ADAPTIVE)
+    img.save(output_path, "PNG", optimize=True)
+
 
 
 def prepare_image_base64(image_path, max_size=1024, quality=85):

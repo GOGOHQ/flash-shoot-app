@@ -162,6 +162,15 @@ final List<RecommendationItem> _recommendationsLocation = [];
           children: [
             ListTile(
               leading: Icon(Icons.photo_library),
+              title: Text('AI姿势生成'),
+              onTap: () {
+                Navigator.pop(context);
+                
+                // Navigator.pushNamed(context, '/upload');
+              },
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_library),
               title: Text('上传照片'),
               onTap: () {
                 Navigator.pop(context);
@@ -195,7 +204,8 @@ final List<RecommendationItem> _recommendationsLocation = [];
     super.initState();
      _initData();
     _scrollController.addListener(_onScroll);
-    _mainTabController = TabController(length: _mainTabs.length, vsync: this);
+  // 默认落在 推荐 (index = 1)
+    _mainTabController = TabController(length: _mainTabs.length, vsync: this, initialIndex: 1);
     _mainTabController.addListener(() {
       setState(() {});
     });
@@ -464,20 +474,6 @@ final List<RecommendationItem> _recommendationsLocation = [];
               Navigator.pushNamed(context, AppRoutes.search);
             },
             icon: const Icon(Icons.search),
-          ),
-          IconButton(
-            onPressed: () {
-              Navigator.pushNamed(context, AppRoutes.apiTest);
-            },
-            icon: const Icon(Icons.bug_report),
-            tooltip: 'API 测试',
-          ),
-          IconButton(
-            onPressed: () {
-              Navigator.pushNamed(context, AppRoutes.networkTest);
-            },
-            icon: const Icon(Icons.wifi),
-            tooltip: '网络测试',
           ),
         ],
         bottom: PreferredSize(

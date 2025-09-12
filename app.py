@@ -1,16 +1,22 @@
 from flask import Flask, request, jsonify, send_from_directory
 import os
 import time
+import shutil
+import glob
 
 app = Flask(__name__)
 
 UPLOAD_FOLDER = 'uploads'
 MOVED_FOLDER = 'moved'
 XIANGAO_FOLDER = 'xiangao'
+BACK_GROUND = 'background'
+BACK_GROUND_PERSON = 'background_person'
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(MOVED_FOLDER, exist_ok=True)
 os.makedirs(XIANGAO_FOLDER, exist_ok=True)
+os.makedirs(BACK_GROUND, exist_ok=True)
+os.makedirs(BACK_GROUND_PERSON, exist_ok=True)
 
 
 def get_user_folder(base, user_id):
@@ -24,6 +30,76 @@ def timestamp_filename(ext):
     ts = int(time.time() * 1000)  # 毫秒
     return f"{ts}{ext}"
 
+#保存到background文件夹
+@app.route('/background', methods=['POST'])
+def background():
+    user_id = request.form.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
+
+    files = request.files.getlist('files')
+    saved = []
+
+    user_background_folder = get_user_folder(BACK_GROUND, user_id)
+
+    for f in files:
+        if f.filename == '':
+            continue
+        ext = os.path.splitext(f.filename)[1].lower()  # 保留原扩展名
+        new_filename = timestamp_filename(ext)
+
+        background_path = os.path.join(user_background_folder, new_filename)
+        f.save(background_path)
+        saved.append(background_path)
+
+    return jsonify({'saved': saved}), 200
+
+@app.route('/transfer_background', methods=['POST'])
+def transfer_background():
+    """
+    将选中的 background_person 图片复制到 uploads 和 moved 文件夹，然后删除 background_person
+    """
+    user_id = request.form.get('user_id')
+    filenames = request.form.getlist('filenames')  # 多选文件名列表
+
+    if not user_id or not filenames:
+        return jsonify({'error': 'user_id and filenames required'}), 400
+
+    uploaded_files = []
+    moved_files = []
+    deleted_files = []
+
+    user_background_folder = os.path.join(BACK_GROUND_PERSON, f"user_{user_id}")
+    user_upload_folder = os.path.join(UPLOAD_FOLDER, f"user_{user_id}")
+    user_moved_folder = os.path.join(MOVED_FOLDER, f"user_{user_id}")
+
+    os.makedirs(user_upload_folder, exist_ok=True)
+    os.makedirs(user_moved_folder, exist_ok=True)
+
+    for fname in filenames:
+        src = os.path.join(user_background_folder, fname)
+        if not os.path.exists(src):
+            continue
+
+        # 保存到 uploads
+        dest_upload = os.path.join(user_upload_folder, fname)
+        shutil.copy(src, dest_upload)
+        uploaded_files.append(f"user_{user_id}/{fname}")
+
+        # 保存到 moved
+        dest_moved = os.path.join(user_moved_folder, fname)
+        shutil.copy(src, dest_moved)
+        moved_files.append(f"user_{user_id}/{fname}")
+
+        # 删除 background_person
+        os.remove(src)
+        deleted_files.append(fname)
+
+    return jsonify({
+        'uploaded': uploaded_files,
+        'moved': moved_files,
+        'deleted': deleted_files
+    }), 200
 
 @app.route('/upload', methods=['POST'])
 def upload():
@@ -56,6 +132,20 @@ def upload():
 
     return jsonify({'saved': saved}), 200
 
+@app.route('/background_person', methods=['GET'])
+def list_background_person():
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
+
+    files_list = []
+    user_folder = get_user_folder(BACK_GROUND_PERSON, user_id)
+
+    for fname in os.listdir(user_folder):
+        if fname.lower().endswith(('.jpg', '.jpeg', '.png', '.gif')):
+            files_list.append(f"/background_person/user_{user_id}/{fname}")
+
+    return jsonify(sorted(files_list, reverse=True)), 200  # 倒序返回
 
 @app.route('/moved', methods=['GET'])
 def list_moved():
@@ -96,6 +186,17 @@ def get_moved_file(user_folder, filename):
 def get_xiangao_file(user_folder, filename):
     return send_from_directory(os.path.join(XIANGAO_FOLDER, user_folder), filename)
 
+@app.route('/background_person/<user_folder>/<path:filename>', methods=['GET'])
+def get_background_person_file(user_folder, filename):
+    """
+    通过 URL 获取 background_person 文件夹下指定用户的某个文件
+    示例 URL: /background_person/user_123/img1.png
+    """
+    directory = os.path.join(BACK_GROUND_PERSON, user_folder)
+    if not os.path.exists(os.path.join(directory, filename)):
+        return jsonify({'error': 'File not found'}), 404
+    return send_from_directory(directory, filename)
+
 @app.route('/delete', methods=['POST'])
 def delete_files():
     user_id = request.form.get('user_id')
@@ -125,6 +226,33 @@ def delete_files():
 
     return jsonify({'deleted': deleted}), 200
 
+@app.route('/deletebackground', methods=['POST'])
+def delete_background_person():
+    """
+    删除指定用户 background_person 文件夹下的所有图片
+    """
+    user_id = request.form.get('user_id')
+    if not user_id:
+        return jsonify({'error': 'user_id required'}), 400
+
+    user_folder = get_user_folder(BACK_GROUND_PERSON, user_id)
+
+    # 查找图片文件
+    pattern = os.path.join(user_folder, '*')
+    files = glob.glob(pattern)
+    deleted_files = []
+
+    for f in files:
+        try:
+            os.remove(f)
+            deleted_files.append(os.path.basename(f))
+        except Exception as e:
+            print(f"Failed to delete {f}: {e}")
+
+    return jsonify({
+        'deleted': deleted_files,
+        'message': f"{len(deleted_files)} files deleted"
+    }), 200
 
 
 if __name__ == '__main__':

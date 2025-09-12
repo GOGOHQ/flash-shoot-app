@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:image_gallery_saver/image_gallery_saver.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 class SearchResultScreen extends StatefulWidget {
   final String keyword;
@@ -64,38 +64,63 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
     });
   }
 
-  /// 保存到相册
-  Future<void> _saveImage(String assetPath) async {
-    // 权限检查
-    final status = await Permission.photos.request();
-    if (!status.isGranted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("没有相册权限，无法保存")),
-      );
-      return;
-    }
+  /// 弹出确认提示
+  Future<bool> _confirmSave(String imgName) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("保存到相册"),
+            content: Text("是否要保存图片 [$imgName] 到相册？"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text("取消"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text("保存"),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  /// 长按保存到相册
+  Future<void> _saveToGallery(String assetPath) async {
+    final fileName = assetPath.split('/').last;
+    final confirm = await _confirmSave(fileName);
+    if (!confirm) return;
 
     try {
       final byteData = await rootBundle.load(assetPath);
       final result = await ImageGallerySaver.saveImage(
-        Uint8List.fromList(byteData.buffer.asUint8List()),
+        Uint8List.view(byteData.buffer),
         quality: 100,
-        name: assetPath.split('/').last,
+        name: fileName,
       );
-      if (result['isSuccess'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("已保存到相册")),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("保存失败")),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result['isSuccess'] ? "保存成功 ✅" : "保存失败 ❌")),
+      );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("错误: $e")),
+        const SnackBar(content: Text("保存失败 ❌")),
       );
     }
+  }
+
+  /// 只展示图片
+  Widget _buildCard(String imgPath) {
+    return GestureDetector(
+      onLongPress: () => _saveToGallery(imgPath),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.asset(
+          imgPath,
+          fit: BoxFit.cover,
+        ),
+      ),
+    );
   }
 
   @override
@@ -113,49 +138,18 @@ class _SearchResultScreenState extends State<SearchResultScreen> {
                 }
                 return false;
               },
-              child: GridView.builder(
+              child: MasonryGridView.count(
                 padding: const EdgeInsets.all(8),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2, // 双列
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: 0.8, // 图片比例
-                ),
+                crossAxisCount: 2, // 双列
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
                 itemCount: displayedImages.length +
                     (currentPage * pageSize < allImages.length ? 1 : 0),
                 itemBuilder: (context, index) {
                   if (index == displayedImages.length) {
                     return const Center(child: CircularProgressIndicator());
                   }
-                  final imgPath = displayedImages[index];
-                  return GestureDetector(
-                    onLongPress: () => _saveImage(imgPath),
-                    child: Card(
-                      clipBehavior: Clip.antiAlias,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: Image.asset(
-                              imgPath,
-                              fit: BoxFit.cover,
-                              width: double.infinity,
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(6.0),
-                            child: Text(
-                              imgPath.split('/').last,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+                  return _buildCard(displayedImages[index]);
                 },
               ),
             ),

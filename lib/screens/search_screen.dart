@@ -13,8 +13,6 @@ class _SearchScreenState extends State<SearchScreen> {
   final List<String> hotSearches = const [
     "旅行拍照",
     "美食",
-    "摄影技巧",
-    "打卡地",
     "风格穿搭",
     "网红景点",
     "天坛",

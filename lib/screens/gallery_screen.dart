@@ -1,10 +1,12 @@
 import 'dart:io';
-
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:dio/dio.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'photo_detail_screen.dart';
+import 'package:flutter/services.dart';
+import '../screens/show_screen.dart';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -24,12 +26,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
   // 上传相关
   bool uploading = false;
-  double uploadProgress = 0.0; // 0.0 - 1.0
+  final ValueNotifier<double> uploadProgressNotifier = ValueNotifier(0.0);
 
   // 本地后端地址
-  final String uploadUrl = 'https://950b4bea7dff.ngrok-free.app/upload';
-  // 自动获取的 user_id
+  final String baseUrl = 'https://1ca781fdc0bd.ngrok-free.app';
   String? userId;
+
+  // 缩略图缓存
+  final Map<int, Uint8List> thumbCache = {};
 
   @override
   void initState() {
@@ -38,7 +42,6 @@ class _GalleryScreenState extends State<GalleryScreen> {
     _fetchAssets();
   }
 
-  // 获取设备唯一标识作为 user_id
   Future<void> _initUserId() async {
     final deviceInfo = DeviceInfoPlugin();
     if (Platform.isIOS) {
@@ -70,13 +73,20 @@ class _GalleryScreenState extends State<GalleryScreen> {
     });
   }
 
+  Future<Uint8List?> _loadThumb(int index) async {
+    if (thumbCache.containsKey(index)) return thumbCache[index];
+    final data =
+        await assets[index].thumbnailDataWithSize(const ThumbnailSize(200, 200));
+    if (data != null) thumbCache[index] = data;
+    return data;
+  }
+
   void _onScaleUpdate(ScaleUpdateDetails details) {
     setState(() {
       scaleFactor *= details.scale;
       if (scaleFactor > 1.5) crossAxisCount = 2;
       else if (scaleFactor < 0.8) crossAxisCount = 5;
       else crossAxisCount = 3;
-
       scaleFactor = scaleFactor.clamp(0.5, 2.0);
     });
   }
@@ -97,27 +107,25 @@ class _GalleryScreenState extends State<GalleryScreen> {
     });
   }
 
+  /// 上传选中的图片（线稿生成）
   Future<void> _uploadSelected() async {
     if (selectedIndices.isEmpty || userId == null) return;
 
     setState(() {
       uploading = true;
-      uploadProgress = 0.0;
     });
+    uploadProgressNotifier.value = 0.0;
 
     final dio = Dio();
+    final formData = FormData();
+    formData.fields.add(MapEntry('user_id', userId!));
+    formData.fields.add(MapEntry('type', 'sketch')); // 标记线稿生成类型
 
     try {
-      final formData = FormData();
-      formData.fields.add(MapEntry('user_id', userId!)); // 自动传 user_id
-
-      final indices = selectedIndices.toList();
-
-      for (var i in indices) {
+      for (var i in selectedIndices) {
         final asset = assets[i];
         final file = await asset.file;
         if (file == null) continue;
-
         final name = file.path.split(Platform.pathSeparator).last;
         formData.files.add(MapEntry(
           'files',
@@ -126,24 +134,17 @@ class _GalleryScreenState extends State<GalleryScreen> {
       }
 
       final response = await dio.post(
-        uploadUrl,
+        "$baseUrl/upload",
         data: formData,
-        options: Options(
-          headers: {'Accept': 'application/json'},
-        ),
+        options: Options(headers: {'Accept': 'application/json'}),
         onSendProgress: (sent, total) {
-          if (total != 0) {
-            setState(() {
-              uploadProgress = sent / total;
-            });
-          }
+          if (total != 0) uploadProgressNotifier.value = sent / total;
         },
       );
 
       if (response.statusCode == 200) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('上传成功')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('上传成功')));
         setState(() {
           selectedIndices.clear();
           selectionMode = false;
@@ -154,15 +155,126 @@ class _GalleryScreenState extends State<GalleryScreen> {
         );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('上传出错: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('上传出错: $e')));
     } finally {
       setState(() {
         uploading = false;
-        uploadProgress = 0.0;
       });
+      uploadProgressNotifier.value = 0.0;
     }
+  }
+
+/// 姿势指导逻辑
+  Future<void> _poseGuidance() async {
+    if (userId == null || selectedIndices.isEmpty) return;
+
+    setState(() {
+      uploading = true;
+    });
+    uploadProgressNotifier.value = 0.0;
+
+    final dio = Dio();
+    final formData = FormData();
+    formData.fields.add(MapEntry('user_id', userId!));
+
+    try {
+      // 将选中的图片加入 formData
+      for (var i in selectedIndices) {
+        final asset = assets[i];
+        final file = await asset.file;
+        if (file == null) continue;
+        final name = file.path.split(Platform.pathSeparator).last;
+        formData.files.add(MapEntry(
+          'files',
+          await MultipartFile.fromFile(file.path, filename: name),
+        ));
+      }
+
+      // 上传到 /background 接口
+      final response = await dio.post(
+        '$baseUrl/background',
+        data: formData,
+        options: Options(headers: {'Accept': 'application/json'}),
+        onSendProgress: (sent, total) {
+          if (total != 0) uploadProgressNotifier.value = sent / total;
+        },
+      );
+
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('上传到 background 成功')));
+
+        // 上传完成后清空选中状态
+        setState(() {
+          selectedIndices.clear();
+          selectionMode = false;
+        });
+
+        // 上传成功后延迟 2 秒跳转到 ShowScreen
+        Future.delayed(const Duration(seconds: 2), () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ShowScreen(
+                baseUrl: baseUrl, // 确保传入 baseUrl
+                userId: userId!,
+              ),
+            ),
+          );
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('上传失败: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('上传出错: $e')));
+    } finally {
+      setState(() {
+        uploading = false;
+      });
+      uploadProgressNotifier.value = 0.0;
+    }
+  }
+
+
+  /// 弹出选择对话框
+  void _showUploadOptions() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('请选择操作'),
+        content: const Text('请选择你要进行的操作'),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _uploadSelected(); // 点击线稿生成
+            },
+            child: const Text('线稿生成'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _poseGuidance(); // 点击姿势指导
+            },
+            child: const Text('姿势指导'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    uploadProgressNotifier.dispose();
+    super.dispose();
   }
 
   @override
@@ -176,7 +288,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
           if (selectionMode)
             IconButton(
               icon: const Icon(Icons.upload_file),
-              onPressed: uploading ? null : _uploadSelected,
+              onPressed: uploading ? null : _showUploadOptions, // 点击弹出对话框
             ),
           if (selectionMode)
             IconButton(
@@ -203,13 +315,11 @@ class _GalleryScreenState extends State<GalleryScreen> {
               ),
               itemCount: assets.length,
               itemBuilder: (context, index) {
-                return FutureBuilder<Widget>(
-                  future: assets[index]
-                      .thumbnailDataWithSize(const ThumbnailSize(200, 200))
-                      .then((data) => Image.memory(data!, fit: BoxFit.cover)),
+                return FutureBuilder<Uint8List?>(
+                  future: _loadThumb(index),
                   builder: (context, snapshot) {
-                    if (!snapshot.hasData) return Container(color: Colors.grey[300]);
-
+                    if (!snapshot.hasData)
+                      return Container(color: Colors.grey[300]);
                     final selected = selectedIndices.contains(index);
 
                     return GestureDetector(
@@ -234,7 +344,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          snapshot.data!,
+                          Image.memory(snapshot.data!, fit: BoxFit.cover),
                           if (selectionMode)
                             Positioned(
                               right: 6,
@@ -265,7 +375,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: LinearProgressIndicator(value: uploadProgress),
+              child: ValueListenableBuilder<double>(
+                valueListenable: uploadProgressNotifier,
+                builder: (context, value, _) {
+                  return LinearProgressIndicator(value: value);
+                },
+              ),
             ),
         ],
       ),
