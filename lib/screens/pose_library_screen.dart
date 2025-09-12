@@ -21,7 +21,7 @@ class PoseLibraryScreen extends StatefulWidget {
 class _PoseLibraryScreenState extends State<PoseLibraryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  final List<String> tabs = ['收藏', '热门', '单人', '双人', '多人', '情侣', '用户上传'];
+  final List<String> tabs = ['用户上传','收藏', '热门', '单人', '双人', '多人', '情侣'];
 
   final Map<String, List<String>> images = {
     '收藏': ['assets/original_picture/收藏/1.jpg'],
@@ -32,7 +32,7 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
     '情侣': ['assets/original_picture/情侣/1.jpg'],
   };
 
-  final String baseUrl = 'https://1473e16831f6.ngrok-free.app';
+  final String baseUrl = 'https://94db55eb2ca8.ngrok-free.app';
 
   List<String> localMovedImages = [];
   List<String> localXiangaoImages = [];
@@ -185,12 +185,42 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
             },
             onLongPress: () async {
               final file = File(imagePath);
+              final fileName = _getFileNameWithoutExtension(imagePath);
+
+              // 删除 moved 文件
               if (await file.exists()) await file.delete();
+
+              // 找到并删除对应的 xiangao 文件
+              final matchXiangao = localXiangaoImages.firstWhere(
+                (e) => _getFileNameWithoutExtension(e) == fileName,
+                orElse: () => '',
+              );
+              if (matchXiangao.isNotEmpty) {
+                final xiangaoFile = File(matchXiangao);
+                if (await xiangaoFile.exists()) await xiangaoFile.delete();
+                setState(() {
+                  localXiangaoImages.remove(matchXiangao);
+                  readFiles.remove(matchXiangao.split('/').last);
+                });
+              }
+
+              // 更新 moved 列表
               setState(() {
                 readFiles.remove(imagePath.split('/').last);
                 localMovedImages.removeAt(index);
               });
               await _updateCacheSize();
+              try {
+                await Dio().post(
+                  "$baseUrl/delete",
+                  data: FormData.fromMap({
+                    "user_id": widget.userId,
+                    "filename": imagePath.split('/').last, // 原始文件名
+                  }),
+                );
+              } catch (e) {
+                print("远程删除失败: $e");
+              }
             },
             child: ClipRRect(
               borderRadius: BorderRadius.circular(8),

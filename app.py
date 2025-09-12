@@ -96,6 +96,36 @@ def get_moved_file(user_folder, filename):
 def get_xiangao_file(user_folder, filename):
     return send_from_directory(os.path.join(XIANGAO_FOLDER, user_folder), filename)
 
+@app.route('/delete', methods=['POST'])
+def delete_files():
+    user_id = request.form.get('user_id')
+    filename = request.form.get('filename')  # 传原始文件名，例如 "123456789.jpg"
+
+    if not user_id or not filename:
+        return jsonify({'error': 'user_id and filename required'}), 400
+
+    deleted = []
+
+    # moved 文件名保持原后缀
+    user_moved_folder = get_user_folder(MOVED_FOLDER, user_id)
+    moved_path = os.path.join(user_moved_folder, filename)
+    if os.path.exists(moved_path):
+        os.remove(moved_path)
+        deleted.append(f"moved/{filename}")
+
+    # xiangao 文件统一后缀 .png
+    name_no_ext, _ = os.path.splitext(filename)
+    xiangao_filename = f"{name_no_ext}.png"
+
+    user_xiangao_folder = get_user_folder(XIANGAO_FOLDER, user_id)
+    xiangao_path = os.path.join(user_xiangao_folder, xiangao_filename)
+    if os.path.exists(xiangao_path):
+        os.remove(xiangao_path)
+        deleted.append(f"xiangao/{xiangao_filename}")
+
+    return jsonify({'deleted': deleted}), 200
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8001, debug=True)

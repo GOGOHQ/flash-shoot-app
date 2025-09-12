@@ -2,21 +2,10 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../config/app_routes.dart';
+import '../services/unsplash_service.dart';
+import '../models/recommendation_item.dart';
+import '../screens/card_detail_screen.dart';
 
-// Class to hold a single item's data
-class _RecommendationItem {
-  final String title;
-  final String username;
-  final String avatarUrl;
-  final String imageUrl;
-
-  _RecommendationItem({
-    required this.title,
-    required this.username,
-    required this.avatarUrl,
-    required this.imageUrl,
-  });
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,6 +17,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late TabController _mainTabController;
   int _subTabIndex = 0;
+  final UnsplashService _unsplashService = UnsplashService();
+  int _currentPage = 1; // 用于分页
   final List<String> _mainTabs = ["关注", "推荐", "热门"];
   final List<String> _recommendSubTabs = [
     "全部",
@@ -37,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     "打卡地",
     "风格",
   ];
+  
 
   int _selectedIndex = 0;
 
@@ -47,67 +39,88 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _NavItem("我", Icons.people, AppRoutes.info),
   ];
 
+  // 主 Tab：关注、推荐、热门
+final List<RecommendationItem> _followingList = []; // 关注页数据
+final List<RecommendationItem> _hotList = [];   // 热门页数据
+
+// 推荐页二级 Tab
+final List<RecommendationItem> _recommendationsPose = [];
+final List<RecommendationItem> _recommendationsEdit = [];
+final List<RecommendationItem> _recommendationsPhoto = [];
+final List<RecommendationItem> _recommendationsLocation = [];
+final List<RecommendationItem> _recommendationsStyle = [];
+
   // Manually specified data for the recommendations
-  final List<_RecommendationItem> _recommendations = [
-    _RecommendationItem(
+  final List<RecommendationItem> _recommendationsAll = [
+    RecommendationItem(
       title: "🪄跟着百变小樱知世学拍照👀包出片的！",
       username: "一颗米栗",
       avatarUrl: "assets/home/1/头像.webp",
       imageUrl: "assets/home/1/1.jpg",
+      likes: 12345,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "晒到的阳光分你一半",
       username: "蓝色水母",
       avatarUrl: "assets/home/2/头像.webp",
       imageUrl: "assets/home/2/2.jpg",
+      likes: 67890,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "520情侣拍照姿势合集来啦！！📸",
       username: "张张呐",
       avatarUrl: "assets/home/3/头像.webp",
       imageUrl: "assets/home/3/3.jpg",
+      likes: 34567,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "ˏ🎂ˎˊ˗「🥂🎂存一些生日拍照姿势吧！",
       username: "陪拍周包子（全能型",
       avatarUrl: "assets/home/4/头像.webp",
       imageUrl: "assets/home/4/4.jpg",
+      likes: 89012,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "青甘环线万能合影模版｜大学生速存💥",
       username: "不定式方程🌻",
       avatarUrl: "assets/home/5/头像.webp",
       imageUrl: "assets/home/5/5.jpg",
+      likes: 23456,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "花少14张合照！北斗七行真的无法超越",
       username: "喵星",
       avatarUrl: "assets/home/6/头像.webp",
       imageUrl: "assets/home/6/6.jpg",
+      likes: 4567,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "情侣这样拍也太有感觉了👩‍❤️‍👨！！",
       username: "休想断我财璐",
       avatarUrl: "assets/home/7/头像.webp",
       imageUrl: "assets/home/7/7.jpg",
+      likes: 5678,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "独属我们的海边胶片回忆💕",
       username: "钱小峰",
       avatarUrl: "assets/home/8/头像.webp",
       imageUrl: "assets/home/8/8.jpg",
+      likes: 6789,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "💙",
       username: "照桥心美",
       avatarUrl: "assets/home/9/头像.webp",
       imageUrl: "assets/home/9/9.jpg",
+      likes: 7890,
     ),
-    _RecommendationItem(
+    RecommendationItem(
       title: "普通人拍也好看的万能拍照姿势📸",
       username: "小酷爱拍照",
       avatarUrl: "assets/home/10/头像.webp",
       imageUrl: "assets/home/10/10.jpg",
+      likes: 8901,
     ),
     // Add more items here
   ];
@@ -115,6 +128,35 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final ScrollController _scrollController = ScrollController();
   bool _isLoadingMore = false;
 
+  List<RecommendationItem> _getCurrentList() {
+    switch (_mainTabController.index) {
+      case 0:
+        return _followingList;
+      case 1:
+        switch (_subTabIndex) {
+          case 0:
+            return _recommendationsAll;
+          case 1:
+            return _recommendationsPose;
+          case 2:
+            return _recommendationsEdit;
+          case 3:
+            return _recommendationsPhoto;
+          case 4:
+            return _recommendationsLocation;
+          case 5:
+            return _recommendationsStyle;
+          default:
+            return _recommendationsAll;
+        }
+      case 2:
+        return _hotList;
+      default:
+        return _recommendationsAll;
+    }
+  }
+
+  
   void _showAddOptions() {
     showModalBottomSheet(
       context: context,
@@ -155,69 +197,117 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
+     _initData();
     _scrollController.addListener(_onScroll);
     _mainTabController = TabController(length: _mainTabs.length, vsync: this);
     _mainTabController.addListener(() {
       setState(() {});
     });
   }
+  Future<void> _initData() async {
+    try {
+      // 获取第一页数据
+      final photos = await _unsplashService.fetchPosePhotos(page: 1, perPage: 25); // 假设每个列表 10 条
 
-  void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200 &&
-        !_isLoadingMore) {
-      _loadMore();
+      // 转换成 RecommendationItem
+      final List<RecommendationItem> items = photos.map((photo) {
+        return RecommendationItem(
+          title: photo['description'] ?? 'No description',
+          username: photo['author']['name'] ?? 'Anonymous',
+          avatarUrl: photo['author']['avatar'] ?? '',
+          imageUrl: photo['small'] ?? '',
+          likes: photo['likes'] ?? 0,
+        );
+      }).toList();
+
+      // 每个列表取 10 条数据
+      setState(() {
+        _hotList.addAll(items.getRange(0, min(3, items.length)));
+        _followingList.addAll(items.getRange(3, min(6, items.length)));
+        _recommendationsPose.addAll(items.getRange(6, min(9, items.length)));
+        _recommendationsEdit.addAll(items.getRange(9, min(12, items.length)));
+        _recommendationsPhoto.addAll(items.getRange(12, min(15, items.length)));
+        _recommendationsLocation.addAll(items.getRange(15, min(18, items.length)));
+        _recommendationsStyle.addAll(items.getRange(18, min(21, items.length)));
+      });
+      _currentPage = 2; // 下一页
+    } catch (e) {
+      print("❌ 初始化数据失败: $e");
     }
   }
 
-  Future<void> _loadMore() async {
+  void _onScroll() {
+    List<RecommendationItem> currentList = _getCurrentList();
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoadingMore) {
+      _loadMoreList(currentList);
+    }
+  }
+
+  Future<void> _loadMoreList(List<RecommendationItem> currentList) async {
     if (_isLoadingMore) return;
     setState(() => _isLoadingMore = true);
-    await Future.delayed(const Duration(seconds: 2));
 
-    // Custom data for new items to load
-    final List<_RecommendationItem> newItems = [
-      _RecommendationItem(
-        title: "又一张自定义照片",
-        username: "新的用户",
-        avatarUrl: "https://example.com/avatars/new_user.jpg",
-imageUrl: "https://example.com/images/new_photo.jpg",
-      ),
-      // Add more new items here
-    ];
+    try {
+      final photos = await _unsplashService.fetchPosePhotos(
+        page: _currentPage,
+        perPage: 10,
+      );
 
-    _recommendations.addAll(newItems);
+      final newItems = photos.map((photo) {
+        return RecommendationItem(
+          title: photo['description'] ?? '无描述',
+          username: photo['author']['name'] ?? '匿名',
+          avatarUrl: photo['author']['avatar'] ?? '',
+          imageUrl: photo['small'] ?? '',
+          likes: photo['likes'] ?? 0,
+        );
+      }).toList();
+
+      setState(() {
+        currentList.addAll(newItems);
+      });
+
+      _currentPage++;
+    } catch (e) {
+      print("❌ 加载 Unsplash 图片失败: $e");
+    }
 
     setState(() {
       _isLoadingMore = false;
     });
   }
 
-  Future<void> _refresh() async {
-    await Future.delayed(const Duration(seconds: 1));
-    _recommendations.clear();
-    // Add your initial custom data back here
-    _recommendations.addAll([
-      _RecommendationItem(
-        title: "我的第一张自定义照片",
-        username: "摄影小能手",
-        avatarUrl: "https://example.com/avatars/user1.jpg",
-imageUrl: "https://example.com/images/photo1.jpg",
-),
-_RecommendationItem(
-title: "美丽的日落",
-        username: "旅行达人",
-        avatarUrl: "https://example.com/avatars/user2.jpg",
-imageUrl: "https://example.com/images/photo2.jpg",
-),
-_RecommendationItem(
-title: "城市夜景",
-        username: "夜拍爱好者",
-        avatarUrl: "https://example.com/avatars/user3.jpg",
-imageUrl: "https://example.com/images/photo3.jpg",
-      ),
-    ]);
-    setState(() {});
+  Future<void> _refreshList(List<RecommendationItem> currentList) async {
+    setState(() {
+      currentList.clear();
+    });
+
+    try {
+      final results = await _unsplashService.fetchPosePhotos(
+        page: _currentPage,
+        perPage: 10,
+      );
+
+      final fetchedItems = results.map((item) {
+        return RecommendationItem(
+          title: item['description'] ?? '无描述',
+          username: item['author']['name'] ?? '匿名',
+          avatarUrl: item['author']['avatar'] ?? '',
+          imageUrl: item['small'] ?? '',
+          likes: item['likes'] ?? 0,
+        );
+      }).toList();
+
+      setState(() {
+        currentList.addAll(fetchedItems);
+      });
+
+      _currentPage++;
+    } catch (e) {
+      print("❌ 获取 Unsplash 图片失败: $e");
+    }
   }
 
   void _onItemTapped(int index) {
@@ -271,61 +361,63 @@ imageUrl: "https://example.com/images/photo3.jpg",
     );
   }
 
-  Widget _buildCard(_RecommendationItem item) {
-    return Card(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      elevation: 3,
-      clipBehavior: Clip.hardEdge,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Image.asset(
-            item.imageUrl,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            errorBuilder: (context, error, stackTrace) =>
-                Container(
-                  height: 100, // Placeholder height on error
-                  color: Colors.grey,
-                  child: const Center(child: Icon(Icons.error)),
-                ),
+  Widget _buildCard(RecommendationItem item) {
+    bool isNetworkImage = item.imageUrl.startsWith('http');
+    bool isNetworkAvatar = item.avatarUrl.startsWith('http');
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => CardDetailScreen(item: item),
           ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Text(
-              item.title,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        );
+      },
+      child: Card(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 3,
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            isNetworkImage
+                ? Image.network(item.imageUrl, fit: BoxFit.cover, width: double.infinity)
+                : Image.asset(item.imageUrl, fit: BoxFit.cover, width: double.infinity),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Text(item.title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
-          ),
-          const SizedBox(height: 8),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 12,
-                  backgroundImage: AssetImage(item.avatarUrl),
-                  onBackgroundImageError: (exception, stackTrace) =>
-                      const Icon(Icons.person),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  item.username,
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                )
-              ],
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Row(
+                children: [
+                  isNetworkAvatar
+                      ? CircleAvatar(radius: 12, backgroundImage: NetworkImage(item.avatarUrl))
+                      : CircleAvatar(radius: 12, backgroundImage: AssetImage(item.avatarUrl)),
+                  const SizedBox(width: 8),
+                  Text(item.username, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                  const Spacer(),
+                  const Icon(Icons.favorite, size: 16, color: Colors.red),
+                  const SizedBox(width: 4),
+                  Text('${item.likes}', style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    List<RecommendationItem> currentList = _getCurrentList();
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -407,17 +499,17 @@ imageUrl: "https://example.com/images/photo3.jpg",
           Expanded(
             child: RefreshIndicator(
               backgroundColor: Colors.white,
-              onRefresh: _refresh,
+              onRefresh: () => _refreshList(currentList),
               child: MasonryGridView.count(
                 controller: _scrollController,
                 crossAxisCount: 2,
                 mainAxisSpacing: 8,
                 crossAxisSpacing: 8,
                 padding: const EdgeInsets.all(8),
-                itemCount: _recommendations.length + (_isLoadingMore ? 1 : 0),
+                itemCount: currentList.length + (_isLoadingMore ? 1 : 0),
                 itemBuilder: (context, index) {
-                  if (index < _recommendations.length) {
-                    return _buildCard(_recommendations[index]);
+                  if (index < currentList.length) {
+                    return _buildCard(currentList[index]);
                   } else {
                     return const Padding(
                       padding: EdgeInsets.all(16),
@@ -453,6 +545,7 @@ imageUrl: "https://example.com/images/photo3.jpg",
       ),
     );
   }
+
 }
 
 class _NavItem {
