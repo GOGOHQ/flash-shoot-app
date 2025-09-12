@@ -22,11 +22,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   final List<String> _mainTabs = ["关注", "推荐", "热门"];
   final List<String> _recommendSubTabs = [
     "全部",
-    "姿势",
-    "修图",
-    "摄影",
-    "打卡地",
-    "风格",
+    "找同伴",
+    "找摄影师",
+    "找模特",
+    "吃喝玩乐",
   ];
   
 
@@ -48,7 +47,6 @@ final List<RecommendationItem> _recommendationsPose = [];
 final List<RecommendationItem> _recommendationsEdit = [];
 final List<RecommendationItem> _recommendationsPhoto = [];
 final List<RecommendationItem> _recommendationsLocation = [];
-final List<RecommendationItem> _recommendationsStyle = [];
 
   // Manually specified data for the recommendations
   final List<RecommendationItem> _recommendationsAll = [
@@ -144,8 +142,6 @@ final List<RecommendationItem> _recommendationsStyle = [];
             return _recommendationsPhoto;
           case 4:
             return _recommendationsLocation;
-          case 5:
-            return _recommendationsStyle;
           default:
             return _recommendationsAll;
         }
@@ -222,13 +218,12 @@ final List<RecommendationItem> _recommendationsStyle = [];
 
       // 每个列表取 10 条数据
       setState(() {
-        _hotList.addAll(items.getRange(0, min(3, items.length)));
-        _followingList.addAll(items.getRange(3, min(6, items.length)));
-        _recommendationsPose.addAll(items.getRange(6, min(9, items.length)));
-        _recommendationsEdit.addAll(items.getRange(9, min(12, items.length)));
-        _recommendationsPhoto.addAll(items.getRange(12, min(15, items.length)));
-        _recommendationsLocation.addAll(items.getRange(15, min(18, items.length)));
-        _recommendationsStyle.addAll(items.getRange(18, min(21, items.length)));
+        _hotList.addAll(items.getRange(0, min(4, items.length)));
+        _followingList.addAll(items.getRange(4, min(8, items.length)));
+        _recommendationsPose.addAll(items.getRange(8, min(12, items.length)));
+        _recommendationsEdit.addAll(items.getRange(12, min(16, items.length)));
+        _recommendationsPhoto.addAll(items.getRange(16, min(20, items.length)));
+        _recommendationsLocation.addAll(items.getRange(20, min(24, items.length)));
       });
       _currentPage = 2; // 下一页
     } catch (e) {

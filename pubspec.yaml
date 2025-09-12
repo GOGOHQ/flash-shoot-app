@@ -28,6 +28,7 @@ environment:
 # the latest version available on pub.dev. To see which dependencies have newer
 # versions available, run `flutter pub outdated`.
 dependencies:
+  flutter_launcher_icons: ^0.13.1
   image_picker: ^1.1.2
   flutter:
     sdk: flutter
@@ -66,6 +67,11 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/logoapp.png" # 你的 logo 路径
 
 dev_dependencies:
   flutter_test:
@@ -118,6 +124,7 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+  
   assets:
     - assets/logo.jpeg
     - assets/poses/
@@ -161,3 +168,9 @@ flutter:
     - assets/home/10/
     - assets/poi/
     - assets/poi_images/
+    - assets/数据库/
+    - assets/数据库/故宫/
+    - assets/数据库/天坛/
+    - assets/数据库/北京红墙/
+    - assets/数据库/环球影城/
+    - assets/数据库/天安门/

@@ -25,7 +25,6 @@ class AppRoutes {
   static const String info = '/info';
   static const String message = '/message';
   static const String search = '/search';
-  static const String result = '/result';
   static const String poseLibrary = '/poseLibrary';
   static const String apiTest = '/apiTest';
   static const String networkTest = '/networkTest';
@@ -50,8 +49,6 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const MessagesScreen());
       case search:
         return MaterialPageRoute(builder: (_) => const SearchScreen());
-      case result:
-        return MaterialPageRoute(builder: (_) => const SearchResultScreen());
       case poseLibrary:
         // 从 arguments 里获取 userId
         final args = settings.arguments as Map<String, dynamic>?;
