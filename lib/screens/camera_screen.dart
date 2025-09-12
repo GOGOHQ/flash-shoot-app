@@ -237,8 +237,8 @@ class _CameraScreenState extends State<CameraScreen> {
                 setState(() {
                   _overlayImagePath = imagePath;
                   _overlayPosePath = posePath;
-                  print("Overlay Image Path: $imagePath");
-                  print("Overlay Pose Path: $posePath");
+                  // print("Overlay Image Path: $imagePath");
+                  // print("Overlay Pose Path: $posePath");
                 });
               },
             ),

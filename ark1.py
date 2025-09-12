@@ -121,7 +121,7 @@ def process_one_file(filepath):
     # 构造输出路径（保持子目录）
     output_dir = os.path.join(XIANGAO_DIR, rel_dir)
     os.makedirs(output_dir, exist_ok=True)
-    output_paths = [os.path.join(output_dir, f"{name_without_ext}_v{i+1}.png") for i in range(4)]
+    output_paths = [os.path.join(output_dir, f"{name_without_ext}{i+1}.jpg") for i in range(4)]
 
     moved_dir = os.path.join(MOVED_DIR, rel_dir)
     os.makedirs(moved_dir, exist_ok=True)

@@ -6,7 +6,6 @@ import '../screens/pose_library_screen.dart';
 import 'dart:typed_data';
 import 'package:device_info_plus/device_info_plus.dart';
 
-
 class CameraBottomBar extends StatefulWidget {
   final VoidCallback? onTakePicture;
   final VoidCallback? onSwitchCamera;
@@ -40,7 +39,7 @@ class _CameraBottomBarState extends State<CameraBottomBar> {
     _loadFirstAsset();
   }
 
-    // 获取设备唯一标识作为 user_id
+  // 获取设备唯一标识作为 user_id
   Future<void> _initUserId() async {
     final deviceInfo = DeviceInfoPlugin();
     if (Platform.isIOS) {
@@ -69,7 +68,7 @@ class _CameraBottomBarState extends State<CameraBottomBar> {
       final assets = await recent.getAssetListRange(start: 0, end: 1);
       if (assets.isNotEmpty) {
         final thumb = await assets.first.thumbnailDataWithSize(
-          const ThumbnailSize(200, 200), // 注意这里要传 ThumbnailSize
+          const ThumbnailSize(200, 200),
         );
         setState(() {
           _firstAsset = assets.first;
@@ -77,7 +76,6 @@ class _CameraBottomBarState extends State<CameraBottomBar> {
         });
       }
     }
-
   }
 
   @override
@@ -142,8 +140,17 @@ class _CameraBottomBarState extends State<CameraBottomBar> {
                     child: Container(
                       width: 48,
                       height: 48,
-                      color: Colors.grey,
-                      child: const Icon(Icons.accessibility_new, color: Colors.white),
+                      decoration: BoxDecoration(
+                        color: Colors.grey,
+                        borderRadius: BorderRadius.circular(6), // 添加圆角，与相册预览入口一致
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.asset(
+                          'assets/pose_icon.png',
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                   ),
 

@@ -29,7 +29,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   final ValueNotifier<double> uploadProgressNotifier = ValueNotifier(0.0);
 
   // 本地后端地址
-  final String baseUrl = 'https://1ca781fdc0bd.ngrok-free.app';
+  final String baseUrl = 'https://1b5de003978e.ngrok-free.app';
   String? userId;
 
   // 缩略图缓存

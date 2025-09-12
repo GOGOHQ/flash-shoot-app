@@ -165,8 +165,7 @@ final List<RecommendationItem> _recommendationsLocation = [];
               title: Text('AI姿势生成'),
               onTap: () {
                 Navigator.pop(context);
-                
-                // Navigator.pushNamed(context, '/upload');
+                Navigator.pushNamed(context, AppRoutes.gallery);
               },
             ),
             ListTile(
