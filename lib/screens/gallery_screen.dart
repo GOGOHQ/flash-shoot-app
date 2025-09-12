@@ -27,7 +27,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   double uploadProgress = 0.0; // 0.0 - 1.0
 
   // 本地后端地址
-  final String uploadUrl = 'https://94db55eb2ca8.ngrok-free.app/upload';
+  final String uploadUrl = 'https://950b4bea7dff.ngrok-free.app/upload';
   // 自动获取的 user_id
   String? userId;
 

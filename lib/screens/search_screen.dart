@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../config/app_routes.dart';
+import 'search_result_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -16,23 +16,30 @@ class _SearchScreenState extends State<SearchScreen> {
     "摄影技巧",
     "打卡地",
     "风格穿搭",
-    "网红景点"
+    "网红景点",
+    "天坛",
+    "故宫",
+    "北京红墙",
+    "环球影城",
+    "天安门",
   ];
 
-  List<String> searchHistory = []; // 搜索历史初始化为空
-
-  List<String> searchResults = []; // 模拟搜索结果
+  List<String> searchHistory = [];
 
   void _onSearch(String keyword) {
     if (keyword.trim().isEmpty) return;
 
-    // 添加到历史，如果已存在则移到前面
     setState(() {
       searchHistory.remove(keyword);
       searchHistory.insert(0, keyword);
     });
-    // 跳转到搜索结果页面
-    Navigator.pushNamed(context, AppRoutes.result);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SearchResultScreen(keyword: keyword),
+      ),
+    );
   }
 
   void _onClearHistory() {
@@ -76,7 +83,6 @@ class _SearchScreenState extends State<SearchScreen> {
               onTap: () {
                 setState(() {
                   _controller.clear();
-                  searchResults.clear();
                 });
               },
               child: const Icon(Icons.close, size: 18),
@@ -100,10 +106,7 @@ class _SearchScreenState extends State<SearchScreen> {
           runSpacing: 8,
           children: hotSearches
               .map((e) => GestureDetector(
-                    onTap: () {
-                      _controller.text = e;
-                      _onSearch(e);
-                    },
+                    onTap: () => _onSearch(e),
                     child: Chip(
                       label: Text(e),
                       backgroundColor: Colors.grey[200],
@@ -161,18 +164,14 @@ class _SearchScreenState extends State<SearchScreen> {
         elevation: 1,
         title: _buildSearchBox(),
       ),
-      body: GestureDetector(
-        behavior: HitTestBehavior.translucent,
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (searchResults.isEmpty) _buildHotSearches(),
-              _buildSearchHistory(),
-            ],
-          ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHotSearches(),
+            _buildSearchHistory(),
+          ],
         ),
       ),
     );

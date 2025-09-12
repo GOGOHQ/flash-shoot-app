@@ -32,7 +32,7 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
     '情侣': ['assets/original_picture/情侣/1.jpg'],
   };
 
-  final String baseUrl = 'https://94db55eb2ca8.ngrok-free.app';
+  final String baseUrl = 'https://950b4bea7dff.ngrok-free.app';
 
   List<String> localMovedImages = [];
   List<String> localXiangaoImages = [];
