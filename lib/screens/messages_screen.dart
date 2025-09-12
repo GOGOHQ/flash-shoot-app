@@ -44,23 +44,15 @@ class MessagesScreen extends StatelessWidget {
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
         items: const [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_outlined),
-            label: "首页",
+            icon: Icon(Icons.map_outlined),
+            label: "机位",
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.local_fire_department_outlined),
-            label: "热门",
+            icon: Icon(Icons.camera_alt_outlined),
+            label: "相机",
           ),
           BottomNavigationBarItem(
-            icon: CircleAvatar(
-              backgroundColor: Colors.red,
-              radius: 15,
-              child: Icon(Icons.add, color: Colors.white, size: 25),
-            ),
-            label: "",
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_bubble_outline),
+            icon: Icon(Icons.message_outlined),
             label: "消息",
           ),
           BottomNavigationBarItem(

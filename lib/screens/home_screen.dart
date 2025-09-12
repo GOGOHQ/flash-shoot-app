@@ -32,10 +32,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   int _selectedIndex = 0;
 
   final List<_NavItem> _items = [
-    _NavItem("机位", Icons.map, AppRoutes.map),
-    _NavItem("相机", Icons.camera_alt, AppRoutes.camera),
-    _NavItem("消息", Icons.message, AppRoutes.message),
-    _NavItem("我", Icons.people, AppRoutes.info),
+    _NavItem("机位", Icons.map_outlined, AppRoutes.map),
+    _NavItem("相机", Icons.camera_alt_outlined, AppRoutes.camera),
+    _NavItem("消息", Icons.message_outlined, AppRoutes.message),
+    _NavItem("我", Icons.person_outline, AppRoutes.info),
   ];
 
   // 主 Tab：关注、推荐、热门
@@ -161,7 +161,7 @@ final List<RecommendationItem> _recommendationsLocation = [];
         child: Column(
           children: [
             ListTile(
-              leading: Icon(Icons.photo_library),
+              leading: Icon(Icons.people_outline_rounded),
               title: Text('AI姿势生成'),
               onTap: () {
                 Navigator.pop(context);
@@ -513,25 +513,43 @@ final List<RecommendationItem> _recommendationsLocation = [];
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
         type: BottomNavigationBarType.fixed,
-        items: _items
-            .map((item) =>
-                BottomNavigationBarItem(icon: Icon(item.icon), label: item.label))
-            .toList(),
         currentIndex: _selectedIndex,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
-        onTap: _onItemTapped,
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: Transform.translate(
-        offset: Offset(0, 25),
-        child: FloatingActionButton.small(
-          onPressed: _showAddOptions,
-          child: Icon(Icons.add),
-          backgroundColor: Colors.red,
-        ),
+        onTap: (index) {
+          if (index == 2) {
+            // 处理加号点击
+            _showAddOptions();
+          } else {
+            _onItemTapped(index > 2 ? index - 1 : index); 
+            // 注意：因为加号不算真正的页面，所以 index > 2 时要 -1
+          }
+        },
+        items: [
+          BottomNavigationBarItem(
+            icon: Icon(_items[0].icon),
+            label: _items[0].label,
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(_items[1].icon),
+            label: _items[1].label,
+          ),
+          const BottomNavigationBarItem(
+            icon: CircleAvatar(
+              backgroundColor: Colors.red,
+              radius: 18,
+              child: Icon(Icons.add, color: Colors.white, size: 28),
+            ),
+            label: "",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(_items[2].icon),
+            label: _items[2].label,
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(_items[3].icon),
+            label: _items[3].label,
+          ),
+        ],
       ),
     );
   }

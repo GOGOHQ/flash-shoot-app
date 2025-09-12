@@ -8,7 +8,6 @@ import '../widgets/camera_bottom_bar.dart';
 import '../widgets/grid_painter.dart';
 
 class CameraScreen extends StatefulWidget {
-
   const CameraScreen({super.key});
 
   @override
@@ -22,8 +21,15 @@ class _CameraScreenState extends State<CameraScreen> {
   List<double> _zoomLevels = [];
   bool _isFlashOn = false;
   GridType _gridType = GridType.none;
-  String? _overlayImagePath; // ✅ 在这里定义
-  String? _overlayPosePath; // ✅ 在这里定义
+  String? _overlayImagePath;
+  String? _overlayPosePath;
+
+  // ✅ 对焦相关
+  Offset? _focusPoint;
+  bool _showFocusRect = false;
+
+  // ✅ 浮动窗口拖动相关
+  Offset _overlayImageOffset = const Offset(16, 16);
 
   @override
   void initState() {
@@ -34,7 +40,6 @@ class _CameraScreenState extends State<CameraScreen> {
   Future<void> _initCamera() async {
     try {
       _cameras = await availableCameras();
-      // 只保留前置和后置摄像头
 
       if (_cameras!.isNotEmpty) {
         _cameraController = CameraController(
@@ -42,16 +47,16 @@ class _CameraScreenState extends State<CameraScreen> {
           ResolutionPreset.max,
           enableAudio: false,
         );
+
         camerasfb = _cameras!.where((c) =>
             c.lensDirection == CameraLensDirection.back ||
-            c.lensDirection == CameraLensDirection.front
-        ).toList();
+            c.lensDirection == CameraLensDirection.front).toList();
+
         await _cameraController!.initialize();
 
-        // 读取相机支持的倍率范围
         final minZoom = await _cameraController!.getMinZoomLevel();
         final maxZoom = await _cameraController!.getMaxZoomLevel();
-        // 自动生成倍率列表（例如 1x, 2x, 3x ... 到最大值）
+
         final List<double> zoomLevels = [];
         for (double z = minZoom; z <= maxZoom; z += 1.0) {
           zoomLevels.add(double.parse(z.toStringAsFixed(1)));
@@ -106,18 +111,15 @@ class _CameraScreenState extends State<CameraScreen> {
     }
 
     try {
-      // 拍照
       final XFile file = await _cameraController!.takePicture();
       debugPrint("拍摄完成: ${file.path}");
 
-      // 请求相册权限
       final permitted = await PhotoManager.requestPermissionExtend();
       if (!permitted.isAuth) {
         debugPrint("相册权限未授权，无法保存照片");
         return;
       }
 
-      // 保存到相册
       final result = await PhotoManager.editor.saveImageWithPath(file.path);
       if (result != null) {
         debugPrint("照片已保存到系统相册: $result");
@@ -134,8 +136,6 @@ class _CameraScreenState extends State<CameraScreen> {
 
     try {
       final currentIndex = camerasfb!.indexOf(_cameraController!.description);
-
-      // 只在两个摄像头之间切换
       final newIndex = (currentIndex == 0) ? 1 : 0;
 
       await _cameraController?.dispose();
@@ -153,7 +153,36 @@ class _CameraScreenState extends State<CameraScreen> {
       debugPrint("切换前后摄像头失败: $e");
     }
   }
- 
+
+  /// ✅ 点击对焦
+  void _onFocusTap(TapUpDetails details, BoxConstraints constraints) async {
+    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+
+    final dx = details.localPosition.dx / constraints.maxWidth;
+    final dy = details.localPosition.dy / constraints.maxHeight;
+    final offset = Offset(dx, dy);
+
+    try {
+      await _cameraController!.setFocusPoint(offset);
+      await _cameraController!.setExposurePoint(offset);
+
+      setState(() {
+        _focusPoint = details.localPosition;
+        _showFocusRect = true;
+      });
+
+      Future.delayed(const Duration(seconds: 1), () {
+        if (mounted) {
+          setState(() {
+            _showFocusRect = false;
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint("对焦失败: $e");
+    }
+  }
+
   @override
   void dispose() {
     _cameraController?.dispose();
@@ -167,69 +196,93 @@ class _CameraScreenState extends State<CameraScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            /// 顶部栏
             CameraTopBar(
               onClose: () => Navigator.pop(context),
               onToggleFlash: _toggleFlash,
               onToggleGrid: _toggleGrid,
             ),
-
-            /// 相机预览区
-            /// 相机预览区 + 浮动窗口
             Expanded(
-              child: Stack(
-                children: [
-                  /// 相机预览
-                  CameraPreviewArea(
-                    controller: _cameraController,
-                    gridType: _gridType,
-                    zoomLevels: _zoomLevels,
-                    overlayPosePath: _overlayPosePath, // ✅ 姿势叠加
-                  ),
-
-                  /// 浮动小窗口（左下角缩略图）
-                  if (_overlayImagePath != null)
-                    Positioned(
-                      left: 16,
-                      bottom: 16,
-                      child: GestureDetector(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (_) => Dialog(
-                              child: Image.asset(
-                                _overlayImagePath!,
-                                fit: BoxFit.contain,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTapUp: (details) => _onFocusTap(details, constraints),
+                    child: Stack(
+                      children: [
+                        CameraPreviewArea(
+                          controller: _cameraController,
+                          gridType: _gridType,
+                          zoomLevels: _zoomLevels,
+                          overlayPosePath: _overlayPosePath,
+                        ),
+                        // 对焦框
+                        if (_showFocusRect && _focusPoint != null)
+                          Positioned(
+                            left: _focusPoint!.dx - 30,
+                            top: _focusPoint!.dy - 30,
+                            child: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.yellow, width: 2),
+                                borderRadius: BorderRadius.circular(8),
                               ),
                             ),
-                          );
-                        },
-                        child: Container(
-                          constraints: const BoxConstraints(
-                            maxWidth: 150, // 限制最大宽
-                            maxHeight: 150, // 限制最大高
                           ),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: Colors.white, width: 2),
-                            borderRadius: BorderRadius.circular(8),
-                            color: Colors.black54,
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: Image.asset(
-                              _overlayImagePath!,
-                              fit: BoxFit.contain,
+                        // ✅ 浮动小窗口，可拖动
+                        if (_overlayImagePath != null)
+                          Positioned(
+                            left: _overlayImageOffset.dx,
+                            top: _overlayImageOffset.dy,
+                            child: GestureDetector(
+                              onPanUpdate: (details) {
+                                setState(() {
+                                  _overlayImageOffset += details.delta;
+
+                                  // 限制拖动范围在屏幕内
+                                  _overlayImageOffset = Offset(
+                                    _overlayImageOffset.dx.clamp(0, constraints.maxWidth - 125),
+                                    _overlayImageOffset.dy.clamp(0, constraints.maxHeight - 150),
+                                  );
+                                });
+                              },
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (_) => Dialog(
+                                    child: Image.asset(
+                                      _overlayImagePath!,
+                                      fit: BoxFit.contain,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                constraints: const BoxConstraints(
+                                  maxWidth: 150,
+                                  maxHeight: 150,
+                                ),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: Colors.white, width: 2),
+                                  borderRadius: BorderRadius.circular(8),
+                                  color: Colors.black54,
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.asset(
+                                    _overlayImagePath!,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                      ],
                     ),
-                ],
+                  );
+                },
               ),
             ),
-
-
-            /// 底部栏
             CameraBottomBar(
               onTakePicture: _takePicture,
               onSwitchCamera: _switchCamera,
@@ -237,8 +290,9 @@ class _CameraScreenState extends State<CameraScreen> {
                 setState(() {
                   _overlayImagePath = imagePath;
                   _overlayPosePath = posePath;
-                  // print("Overlay Image Path: $imagePath");
-                  // print("Overlay Pose Path: $posePath");
+
+                  // 初始浮动窗口位置
+                  _overlayImageOffset = const Offset(16, 16);
                 });
               },
             ),

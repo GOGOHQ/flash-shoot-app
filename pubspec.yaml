@@ -35,6 +35,7 @@ dependencies:
   camera: ^0.11.0
   flutter_svg: ^2.0.9
   gallery_saver: ^2.3.2
+  sleek_circular_slider: ^2.0.1
   # 后端请求
   dio: ^5.2.1
   shared_preferences: ^2.2.2
@@ -130,11 +131,6 @@ flutter:
   assets:
     - assets/logo.jpeg
     - assets/poses/
-    - assets/poses/single_pose/
-    - assets/poses/double_pose/
-    - assets/poses/triple_pose/
-    - assets/poses/multi_pose/
-    - assets/poses/poses.json
     - assets/original_picture/
     - assets/original_picture/单人/
     - assets/original_picture/双人/

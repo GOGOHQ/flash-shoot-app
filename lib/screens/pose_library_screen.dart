@@ -53,13 +53,6 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
       'assets/original_picture/单人/6.jpg',
       'assets/original_picture/单人/7.jpg',
       'assets/original_picture/单人/8.jpg',
-      'assets/original_picture/单人/9.jpg',
-      'assets/original_picture/单人/10.jpg',
-      'assets/original_picture/单人/11.jpg',
-      'assets/original_picture/单人/12.jpg',
-      'assets/original_picture/单人/13.jpg',
-      'assets/original_picture/单人/14.jpg',
-      'assets/original_picture/单人/15.jpg',
     ],
     '双人': [
       'assets/original_picture/双人/1.jpg',
@@ -74,15 +67,6 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
       'assets/original_picture/双人/10.jpg',
       'assets/original_picture/双人/11.jpg',
       'assets/original_picture/双人/12.jpg',
-      'assets/original_picture/双人/13.jpg',
-      'assets/original_picture/双人/14.jpg',
-      'assets/original_picture/双人/15.jpg',
-      'assets/original_picture/双人/16.jpg',
-      'assets/original_picture/双人/17.jpg',
-      'assets/original_picture/双人/18.jpg',
-      'assets/original_picture/双人/19.jpg',
-      'assets/original_picture/双人/20.jpg',
-      'assets/original_picture/双人/21.jpg',
     ],
     '多人': [
      'assets/original_picture/多人/1.jpg',
@@ -109,10 +93,6 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
       'assets/original_picture/多人/22.jpg',
       'assets/original_picture/多人/23.jpg',
       'assets/original_picture/多人/24.jpg',
-      'assets/original_picture/多人/25.jpg',
-      'assets/original_picture/多人/26.jpg',
-      'assets/original_picture/多人/27.jpg',
-      'assets/original_picture/多人/28.jpg',
     ],
     '情侣': [
       'assets/original_picture/情侣/1.jpg',
@@ -134,16 +114,6 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
       'assets/original_picture/情侣/17.jpg',
       'assets/original_picture/情侣/18.jpg',
       'assets/original_picture/情侣/19.jpg',
-      'assets/original_picture/情侣/20.jpg',
-      'assets/original_picture/情侣/21.jpg',
-      'assets/original_picture/情侣/22.jpg',
-      'assets/original_picture/情侣/23.jpg',
-      'assets/original_picture/情侣/24.jpg',
-      'assets/original_picture/情侣/25.jpg',
-      'assets/original_picture/情侣/26.jpg',
-      'assets/original_picture/情侣/27.jpg',
-      'assets/original_picture/情侣/28.jpg',
-      'assets/original_picture/情侣/29.jpg',
     ],
   };
 
@@ -299,6 +269,28 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
               Navigator.pop(context);
             },
             onLongPress: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (context) {
+                  return AlertDialog(
+                    title: const Text("确认删除"),
+                    content: const Text("确定要删除这张图片吗？\n（会同时删除对应的效果图）"),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text("取消"),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text("删除", style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  );
+                },
+              );
+
+              if (confirm != true) return; // 用户点取消，不执行删除
+
               final file = File(imagePath);
               final fileName = _getFileNameWithoutExtension(imagePath);
 
@@ -325,6 +317,7 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
                 localMovedImages.removeAt(index);
               });
               await _updateCacheSize();
+
               try {
                 await Dio().post(
                   "$baseUrl/delete",
