@@ -291,7 +291,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
         ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -318,15 +318,15 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                   child: const Icon(
                     Icons.location_on_rounded,
                     color: Colors.white,
-                    size: 24,
+                    size: 18,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     widget.poi.name,
                     style: const TextStyle(
-                      fontSize: 26,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
                     ),
@@ -334,7 +334,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 12),
             
             // 地址信息
             _buildInfoRow(
@@ -346,22 +346,22 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
             
             // 分类信息
             if (widget.poi.detailInfo.classifiedPoiTag.isNotEmpty)
-              _buildInfoRow(
-                icon: Icons.category_rounded,
-                label: '分类',
-                value: widget.poi.detailInfo.classifiedPoiTag,
-                color: Colors.green,
-              ),
+              // _buildInfoRow(
+              //   icon: Icons.category_rounded,
+              //   label: '分类',
+              //   value: widget.poi.detailInfo.classifiedPoiTag,
+              //   color: Colors.green,
+              // ),
             
             // 距离信息
-            _buildInfoRow(
-              icon: Icons.directions_walk_rounded,
-              label: '距离',
-              value: '${widget.poi.detailInfo.distance}m',
-              color: Colors.blue,
-            ),
+            // _buildInfoRow(
+            //   icon: Icons.directions_walk_rounded,
+            //   label: '距离',
+            //   value: '${widget.poi.detailInfo.distance}m',
+            //   color: Colors.blue,
+            // ),
             
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
             
             // 天气查询按钮
             Container(
@@ -387,12 +387,12 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                   onTap: _getWeatherInfo,
                   borderRadius: BorderRadius.circular(16),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          padding: const EdgeInsets.all(8),
+                          padding: const EdgeInsets.all(6),
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
@@ -458,7 +458,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Colors.purple[400]!, Colors.purple[600]!],
@@ -480,32 +480,36 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                     size: 24,
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 const Text(
                   '拍照机位',
                   style: TextStyle(
-                    fontSize: 24,
+                    fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.black87,
                   ),
                 ),
               ],
             ),
-            
+            SizedBox(height: 8,),
             // 双列网格布局
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
-                childAspectRatio: 0.7, // 减小比例让图片更长
-              ),
-              itemCount: _poiImages!.length,
-              itemBuilder: (context, index) {
-                final imageItem = _poiImages![index];
-                return Material(
+            MediaQuery.removePadding(
+              context: context,
+              removeTop: true,
+              child: GridView.builder(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.6, // 调低比例以增大高度
+                ),
+                itemCount: _poiImages!.length,
+                itemBuilder: (context, index) {
+                  final imageItem = _poiImages![index];
+                  return Material(
                   color: Colors.transparent,
                   child: InkWell(
                     
@@ -625,6 +629,7 @@ class _PoiDetailScreenState extends State<PoiDetailScreen> {
                 );
               },
             ),
+          ),
           ],
         ),
       ),

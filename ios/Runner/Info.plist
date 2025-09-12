@@ -33,7 +33,7 @@
 		<key>NSExceptionDomains</key>
 		<dict>
 		<!-- 白名单IP-->
-			<key>172.26.35.220</key>
+			<key>172.21.222.203</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
 				<true/>

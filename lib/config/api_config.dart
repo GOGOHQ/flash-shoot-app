@@ -1,9 +1,9 @@
 class ApiConfig {
   // API 基础 URL - 使用您电脑的局域网 IP
-  static const String baseUrl = 'http://172.26.35.220:9001';
+  static const String baseUrl = 'http://169.254.206.128:8881';
   
   // 备用 URL（如果需要的话）
-  static const String backupBaseUrl = 'http://172.26.35.220:9001';
+  static const String backupBaseUrl = 'http://169.254.206.128:8881';
   
   // 超时设置
   static const Duration connectionTimeout = Duration(seconds: 30);

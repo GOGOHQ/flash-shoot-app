@@ -161,14 +161,18 @@ class _SearchScreenState extends State<SearchScreen> {
         elevation: 1,
         title: _buildSearchBox(),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (searchResults.isEmpty) _buildHotSearches(),
-            _buildSearchHistory(),
-          ],
+      body: GestureDetector(
+        behavior: HitTestBehavior.translucent,
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (searchResults.isEmpty) _buildHotSearches(),
+              _buildSearchHistory(),
+            ],
+          ),
         ),
       ),
     );
