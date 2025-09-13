@@ -69,9 +69,9 @@ def transfer_background():
     moved_files = []
     deleted_files = []
 
-    user_background_folder = os.path.join(BACK_GROUND_PERSON, f"user_{user_id}")
-    user_upload_folder = os.path.join(UPLOAD_FOLDER, f"user_{user_id}")
-    user_moved_folder = os.path.join(MOVED_FOLDER, f"user_{user_id}")
+    user_background_folder = get_user_folder(BACK_GROUND_PERSON, user_id)
+    user_upload_folder = get_user_folder(UPLOAD_FOLDER, user_id)
+    user_moved_folder = get_user_folder(MOVED_FOLDER, user_id)
 
     os.makedirs(user_upload_folder, exist_ok=True)
     os.makedirs(user_moved_folder, exist_ok=True)
@@ -91,9 +91,15 @@ def transfer_background():
         shutil.copy(src, dest_moved)
         moved_files.append(f"user_{user_id}/{fname}")
 
-        # 删除 background_person
-        os.remove(src)
-        deleted_files.append(fname)
+    # 查找图片文件
+    pattern = os.path.join(user_background_folder, '*')
+    files = glob.glob(pattern)
+    for f in files:
+      try:
+          os.remove(f)
+          deleted_files.append(os.path.basename(f))
+      except Exception as e:
+          print(f"Failed to delete {f}: {e}")
 
     return jsonify({
         'uploaded': uploaded_files,

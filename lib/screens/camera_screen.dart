@@ -219,7 +219,7 @@ class _CameraScreenState extends State<CameraScreen> {
                         if (_showFocusRect && _focusPoint != null)
                           Positioned(
                             left: _focusPoint!.dx - 30,
-                            top: _focusPoint!.dy - 30,
+                            top: _focusPoint!.dy - 150,
                             child: Container(
                               width: 60,
                               height: 60,

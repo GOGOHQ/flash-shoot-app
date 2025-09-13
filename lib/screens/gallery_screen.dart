@@ -29,7 +29,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   final ValueNotifier<double> uploadProgressNotifier = ValueNotifier(0.0);
 
   // 本地后端地址
-  final String baseUrl = 'https://1b5de003978e.ngrok-free.app';
+  final String baseUrl = 'https://dfa701042fd7.ngrok-free.app';
   String? userId;
 
   // 缩略图缓存
@@ -212,7 +212,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
         });
 
         // 上传成功后延迟 2 秒跳转到 ShowScreen
-        Future.delayed(const Duration(seconds: 2), () {
+        Future.delayed(const Duration(seconds: 0), () {
           Navigator.push(
             context,
             MaterialPageRoute(
