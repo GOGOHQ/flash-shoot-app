@@ -47,13 +47,7 @@ def background():
     user_id = metadata.get("user_id")
     if not user_id:
         return jsonify({'error': 'user_id required in metadata'}), 400
-
-    # 2. 保存 metadata.json
     user_background_folder = get_user_folder(BACK_GROUND, user_id)
-    metadata_path = os.path.join(user_background_folder, "metadata.json")
-    with open(metadata_path, "w", encoding="utf-8") as f:
-        json.dump(metadata, f, ensure_ascii=False, indent=2)
-
     # 3. 处理文件上传
     saved = []
     flag = metadata.get("flag")
@@ -74,6 +68,10 @@ def background():
         dest_background = os.path.join(user_background_folder, fname)
         shutil.copy(src, dest_background)
         saved.append(f"user_{user_id}/{fname}")
+      # 2. 保存 metadata.json
+      metadata_path = os.path.join(user_background_folder, "metadata.json")
+      with open(metadata_path, "w", encoding="utf-8") as f:
+          json.dump(metadata, f, ensure_ascii=False, indent=2)
       return jsonify({
         'saved': saved,
         'metadata_file': metadata_path
@@ -91,7 +89,10 @@ def background():
         background_path = os.path.join(user_background_folder, new_filename)
         f.save(background_path)
         saved.append(background_path)
-
+          # 2. 保存 metadata.json
+    metadata_path = os.path.join(user_background_folder, "metadata.json")
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
     return jsonify({
         'saved': saved,
         'metadata_file': metadata_path

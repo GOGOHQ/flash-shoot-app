@@ -23,7 +23,7 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
   late TabController _tabController;
   final List<String> tabs = ['用户上传','收藏', '热门', '单人', '双人', '多人', '情侣'];
   
-  final String baseUrl = 'https://88866280c441.ngrok-free.app';
+  final String baseUrl = 'https://ed8201248f54.ngrok-free.app';
   
   final Map<String, List<String>> images = {
     '收藏': [
@@ -197,8 +197,8 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
   /// 初始化加载后端 moved 和 xiangao 图片，只下载未读取的新文件
   Future<void> _initData() async {
     await _loadLocalCache();
-    await _fetchNewFiles('moved');
     await _fetchNewFiles('xiangao');
+    await _fetchNewFiles('moved');
   }
 
   Future<void> _fetchNewFiles(String folder) async {
@@ -388,6 +388,24 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Center(child: Text("缓存: ${cacheSize}MB")),
+          ),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              // Show loading indicator (optional)
+              setState(() {
+                cacheSize = 0; // Optionally reset cache size to show loading
+              });
+
+              // Refresh data
+              await _initData();
+
+              // Refresh the UI
+              setState(() {
+                // Update cache size after refreshing
+                // You can also trigger other UI updates if needed
+              });
+            },
           ),
         ],
         bottom: TabBar(
