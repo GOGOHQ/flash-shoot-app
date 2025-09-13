@@ -30,7 +30,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
   final ValueNotifier<double> uploadProgressNotifier = ValueNotifier(0.0);
 
   // 本地后端地址
-  final String baseUrl = 'https://84c40fd44609.ngrok-free.app';
+  final String baseUrl = 'https://88866280c441.ngrok-free.app';
   String? userId;
   // 用户属性（全部字符串）
   String gender = "";
@@ -552,6 +552,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
             ),
             const SizedBox(height: 16),
             TextField(
+              maxLines: null,
               controller: styleController,
               decoration: InputDecoration(
                 labelText: "风格",

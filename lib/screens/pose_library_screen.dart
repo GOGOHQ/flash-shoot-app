@@ -22,7 +22,9 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final List<String> tabs = ['用户上传','收藏', '热门', '单人', '双人', '多人', '情侣'];
-
+  
+  final String baseUrl = 'https://88866280c441.ngrok-free.app';
+  
   final Map<String, List<String>> images = {
     '收藏': [
       'assets/original_picture/收藏/1.jpg',
@@ -117,7 +119,6 @@ class _PoseLibraryScreenState extends State<PoseLibraryScreen>
     ],
   };
 
-  final String baseUrl = 'https://84c40fd44609.ngrok-free.app';
 
   List<String> localMovedImages = [];
   List<String> localXiangaoImages = [];

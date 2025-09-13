@@ -55,8 +55,32 @@ def background():
         json.dump(metadata, f, ensure_ascii=False, indent=2)
 
     # 3. 处理文件上传
-    files = request.files.getlist('files')
     saved = []
+    flag = metadata.get("flag")
+    if not flag:
+        return jsonify({'error': 'flag required in metadata'}), 400
+    if flag == 'weitiao':
+      background_files = []
+      user_background_person_folder = get_user_folder(BACK_GROUND_PERSON, user_id)
+      os.makedirs(user_background_person_folder, exist_ok=True)
+      filenames = request.form.getlist('filenames') 
+      if not user_id or not filenames:
+          return jsonify({'error': 'user_id and filenames required'}), 400
+      for fname in filenames:
+        src = os.path.join(user_background_person_folder, fname)
+        if not os.path.exists(src):
+            continue
+        # 保存到 uploads
+        dest_background = os.path.join(user_background_folder, fname)
+        shutil.copy(src, dest_background)
+        saved.append(f"user_{user_id}/{fname}")
+      return jsonify({
+        'saved': saved,
+        'metadata_file': metadata_path
+    }), 200
+
+    files = request.files.getlist('files')
+    
 
     for f in files:
         if f.filename == '':
