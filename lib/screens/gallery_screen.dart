@@ -7,6 +7,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'photo_detail_screen.dart';
 import 'package:flutter/services.dart';
 import '../screens/show_screen.dart';
+import 'dart:convert';
 
 class GalleryScreen extends StatefulWidget {
   const GalleryScreen({super.key});
@@ -29,8 +30,18 @@ class _GalleryScreenState extends State<GalleryScreen> {
   final ValueNotifier<double> uploadProgressNotifier = ValueNotifier(0.0);
 
   // 本地后端地址
-  final String baseUrl = 'https://dfa701042fd7.ngrok-free.app';
+  final String baseUrl = 'https://84c40fd44609.ngrok-free.app';
   String? userId;
+  // 用户属性（全部字符串）
+  String gender = "";
+  String age = "";
+  String height = "";
+  String weight = "";
+
+  // 个性化定制
+  String peopleCount = "";
+  String style = "";
+  String flag = "";
 
   // 缩略图缓存
   final Map<int, Uint8List> thumbCache = {};
@@ -107,7 +118,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
     });
   }
 
-  /// 上传选中的图片（线稿生成）
+  // 上传选中的图片（线稿生成）
   Future<void> _uploadSelected() async {
     if (selectedIndices.isEmpty || userId == null) return;
 
@@ -164,8 +175,7 @@ class _GalleryScreenState extends State<GalleryScreen> {
       uploadProgressNotifier.value = 0.0;
     }
   }
-
-/// 姿势指导逻辑
+  // 姿势指导
   Future<void> _poseGuidance() async {
     if (userId == null || selectedIndices.isEmpty) return;
 
@@ -176,26 +186,43 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
     final dio = Dio();
     final formData = FormData();
-    formData.fields.add(MapEntry('user_id', userId!));
+
+    // ===== 1. 用户信息和定制参数打包成 JSON =====
+    final metadata = {
+      "user_id": userId,
+      "gender": gender,
+      "age": age,
+      "height": height,
+      "weight": weight,
+      "peopleCount": peopleCount, // 人数
+      "style": style,  // 风格
+      "flag": flag,   // 判断是姿势指导还是姿势推荐
+    };
+
+    // // 注意这里把 JSON 转成字符串放到 formData 里
+    // formData.fields.add(MapEntry("metadata", metadata.toString())); 
+    // 如果后端需要标准 JSON，建议用：
+    // import 'dart:convert';
+    formData.fields.add(MapEntry("metadata", jsonEncode(metadata)));
 
     try {
-      // 将选中的图片加入 formData
+      // ===== 2. 将选中的图片加入 formData =====
       for (var i in selectedIndices) {
         final asset = assets[i];
         final file = await asset.file;
         if (file == null) continue;
         final name = file.path.split(Platform.pathSeparator).last;
         formData.files.add(MapEntry(
-          'files',
+          "files",
           await MultipartFile.fromFile(file.path, filename: name),
         ));
       }
 
-      // 上传到 /background 接口
+      // ===== 3. 上传 =====
       final response = await dio.post(
-        '$baseUrl/background',
+        "$baseUrl/background",
         data: formData,
-        options: Options(headers: {'Accept': 'application/json'}),
+        options: Options(headers: {"Accept": "application/json"}),
         onSendProgress: (sent, total) {
           if (total != 0) uploadProgressNotifier.value = sent / total;
         },
@@ -203,21 +230,20 @@ class _GalleryScreenState extends State<GalleryScreen> {
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('上传到 background 成功')));
+            .showSnackBar(const SnackBar(content: Text("上传到 background 成功")));
 
-        // 上传完成后清空选中状态
         setState(() {
           selectedIndices.clear();
           selectionMode = false;
         });
 
-        // 上传成功后延迟 2 秒跳转到 ShowScreen
-        Future.delayed(const Duration(seconds: 0), () {
+        // 跳转到 ShowScreen
+        Future.delayed(const Duration(milliseconds: 500), () {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (_) => ShowScreen(
-                baseUrl: baseUrl, // 确保传入 baseUrl
+                baseUrl: baseUrl,
                 userId: userId!,
               ),
             ),
@@ -225,12 +251,12 @@ class _GalleryScreenState extends State<GalleryScreen> {
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('上传失败: ${response.statusCode}')),
+          SnackBar(content: Text("上传失败: ${response.statusCode}")),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('上传出错: $e')));
+          .showSnackBar(SnackBar(content: Text("上传出错: $e")));
     } finally {
       setState(() {
         uploading = false;
@@ -239,37 +265,329 @@ class _GalleryScreenState extends State<GalleryScreen> {
     }
   }
 
-
-  /// 弹出选择对话框
   void _showUploadOptions() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('请选择操作'),
-        content: const Text('请选择你要进行的操作'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Center(
+          child: Text(
+            '请选择操作',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ===== 功能类 =====
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.person_outline),
+                label: const Text('用户属性'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showUserAttributesDialog();
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.tune),
+                label: const Text('个性化定制'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _showCustomizationDialog();
+                  // TODO: 打开个性化定制对话框
+                },
+              ),
+            ),
+
+            // ===== 分隔线 =====
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Divider(thickness: 1.2),
+            ),
+
+            // ===== 上传类 =====
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.draw),
+                label: const Text('线稿生成'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pop(context);
+                  _uploadSelected();
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.accessibility_new),
+                label: const Text('姿势指导'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() {
+                    flag = "zhidao";
+                  });
+                  Navigator.pop(context);
+                  _poseGuidance();
+                },
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.accessibility_new),
+                label: const Text('姿势推荐'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  setState(() {
+                    flag = "tuijian";
+                  });
+                  Navigator.pop(context);
+                  _poseGuidance();
+                },
+              ),
+            ),          
+          ],
+        ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _uploadSelected(); // 点击线稿生成
-            },
-            child: const Text('线稿生成'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _poseGuidance(); // 点击姿势指导
-            },
-            child: const Text('姿势指导'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
           ),
         ],
       ),
     );
   }
+
+  /// 输入用户属性的对话框
+  void _showUserAttributesDialog() {
+    final genderOptions = ["男", "女", "其他"];
+    String tempGender = gender.isNotEmpty ? gender : genderOptions[0];
+
+    final ageController = TextEditingController(text: age);
+    final heightController = TextEditingController(text: height);
+    final weightController = TextEditingController(text: weight);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          "填写用户属性",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 性别选择
+              DropdownButtonFormField<String>(
+                value: tempGender,
+                items: genderOptions
+                    .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) tempGender = value;
+                },
+                decoration: InputDecoration(
+                  labelText: "性别",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 年龄
+              TextField(
+                controller: ageController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: "年龄",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 身高
+              TextField(
+                controller: heightController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: "身高 (cm)",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // 体重
+              TextField(
+                controller: weightController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: "体重 (kg)",
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.spaceBetween,
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // 关闭用户属性对话框
+              _showUploadOptions();   // 回到上传选项对话框
+            },
+            child: const Text("取消"),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            onPressed: () {
+              setState(() {
+                gender = tempGender;
+                age = ageController.text.trim();
+                height = heightController.text.trim();
+                weight = weightController.text.trim();
+              });
+              Navigator.pop(context);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("用户属性已保存")),
+              );
+              _showUploadOptions();   // 回到上传选项对话框
+            },
+            child: const Text("确定"),
+          ),
+        ],
+      ),
+    );
+  }
+
+/// 个性化定制对话框
+  void _showCustomizationDialog() {
+    final TextEditingController peopleController =
+        TextEditingController(text: peopleCount);
+    final TextEditingController styleController =
+        TextEditingController(text: style);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Center(
+          child: Text(
+            "个性化定制",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: peopleController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "人数",
+                prefixIcon: const Icon(Icons.group),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: styleController,
+              decoration: InputDecoration(
+                labelText: "风格",
+                prefixIcon: const Icon(Icons.brush),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // 关闭对话框
+              _showUploadOptions();
+            },
+            child: const Text("取消"),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                peopleCount = peopleController.text.trim();
+                style = styleController.text.trim();
+              });
+              Navigator.pop(context); // 关闭对话框
+              _showUploadOptions();
+            },
+            child: const Text("确认"),
+          ),
+        ],
+      ),
+    );
+  }
+
+
 
   @override
   void dispose() {
@@ -309,7 +627,14 @@ class _GalleryScreenState extends State<GalleryScreen> {
           if (selectionMode)
             IconButton(
               icon: const Icon(Icons.upload_file),
-              onPressed: uploading ? null : _showUploadOptions, // 点击弹出对话框
+              onPressed: uploading ? null : () {
+                setState(() {
+                  peopleCount = "";
+                  style = "";
+                  flag = "";
+                });
+                _showUploadOptions();
+              }, // 点击弹出对话框
             ),
           if (selectionMode)
             IconButton(

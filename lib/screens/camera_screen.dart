@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:flutter/services.dart'; // 导入系统设置
-
 import '../config/app_routes.dart';
 import '../widgets/camera_top_bar.dart';
 import '../widgets/camera_preview_area.dart';
@@ -26,34 +24,17 @@ class _CameraScreenState extends State<CameraScreen> {
   String? _overlayImagePath;
   String? _overlayPosePath;
 
-  // 对焦相关
+  // ✅ 对焦相关
   Offset? _focusPoint;
   bool _showFocusRect = false;
 
-  // 浮动窗口拖动相关
+  // ✅ 浮动窗口拖动相关
   Offset _overlayImageOffset = const Offset(16, 16);
 
   @override
   void initState() {
     super.initState();
-    // 禁止屏幕旋转
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp, // 只允许竖屏
-    ]);
     _initCamera();
-  }
-
-  @override
-  void dispose() {
-    // 恢复系统默认方向设置（如果你需要允许其他页面旋转的话）
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    _cameraController?.dispose();
-    super.dispose();
   }
 
   Future<void> _initCamera() async {
@@ -173,6 +154,7 @@ class _CameraScreenState extends State<CameraScreen> {
     }
   }
 
+  /// ✅ 点击对焦
   void _onFocusTap(TapUpDetails details, BoxConstraints constraints) async {
     if (_cameraController == null || !_cameraController!.value.isInitialized) return;
 
@@ -202,6 +184,12 @@ class _CameraScreenState extends State<CameraScreen> {
   }
 
   @override
+  void dispose() {
+    _cameraController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
@@ -227,6 +215,7 @@ class _CameraScreenState extends State<CameraScreen> {
                           zoomLevels: _zoomLevels,
                           overlayPosePath: _overlayPosePath,
                         ),
+                        // 对焦框
                         if (_showFocusRect && _focusPoint != null)
                           Positioned(
                             left: _focusPoint!.dx - 30,
@@ -240,6 +229,7 @@ class _CameraScreenState extends State<CameraScreen> {
                               ),
                             ),
                           ),
+                        // ✅ 浮动小窗口，可拖动
                         if (_overlayImagePath != null)
                           Positioned(
                             left: _overlayImageOffset.dx,
@@ -248,6 +238,8 @@ class _CameraScreenState extends State<CameraScreen> {
                               onPanUpdate: (details) {
                                 setState(() {
                                   _overlayImageOffset += details.delta;
+
+                                  // 限制拖动范围在屏幕内
                                   _overlayImageOffset = Offset(
                                     _overlayImageOffset.dx.clamp(0, constraints.maxWidth - 125),
                                     _overlayImageOffset.dy.clamp(0, constraints.maxHeight - 150),
@@ -298,6 +290,8 @@ class _CameraScreenState extends State<CameraScreen> {
                 setState(() {
                   _overlayImagePath = imagePath;
                   _overlayPosePath = posePath;
+
+                  // 初始浮动窗口位置
                   _overlayImageOffset = const Offset(16, 16);
                 });
               },

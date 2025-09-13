@@ -3,6 +3,7 @@ import os
 import time
 import shutil
 import glob
+import json
 
 app = Flask(__name__)
 
@@ -33,26 +34,44 @@ def timestamp_filename(ext):
 #保存到background文件夹
 @app.route('/background', methods=['POST'])
 def background():
-    user_id = request.form.get('user_id')
-    if not user_id:
-        return jsonify({'error': 'user_id required'}), 400
+    # 1. metadata 解析
+    metadata_str = request.form.get('metadata')
+    if not metadata_str:
+        return jsonify({'error': 'metadata required'}), 400
 
+    try:
+        metadata = json.loads(metadata_str)  # 解析成 dict
+    except Exception as e:
+        return jsonify({'error': f'invalid metadata json: {e}'}), 400
+
+    user_id = metadata.get("user_id")
+    if not user_id:
+        return jsonify({'error': 'user_id required in metadata'}), 400
+
+    # 2. 保存 metadata.json
+    user_background_folder = get_user_folder(BACK_GROUND, user_id)
+    metadata_path = os.path.join(user_background_folder, "metadata.json")
+    with open(metadata_path, "w", encoding="utf-8") as f:
+        json.dump(metadata, f, ensure_ascii=False, indent=2)
+
+    # 3. 处理文件上传
     files = request.files.getlist('files')
     saved = []
-
-    user_background_folder = get_user_folder(BACK_GROUND, user_id)
 
     for f in files:
         if f.filename == '':
             continue
-        ext = os.path.splitext(f.filename)[1].lower()  # 保留原扩展名
+        ext = os.path.splitext(f.filename)[1].lower()
         new_filename = timestamp_filename(ext)
 
         background_path = os.path.join(user_background_folder, new_filename)
         f.save(background_path)
         saved.append(background_path)
 
-    return jsonify({'saved': saved}), 200
+    return jsonify({
+        'saved': saved,
+        'metadata_file': metadata_path
+    }), 200
 
 @app.route('/transfer_background', methods=['POST'])
 def transfer_background():
