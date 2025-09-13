@@ -157,7 +157,7 @@ final List<RecommendationItem> _recommendationsLocation = [];
     showModalBottomSheet(
       context: context,
       builder: (context) => Container(
-        height: 180,
+        height: 240,
         child: Column(
           children: [
             ListTile(

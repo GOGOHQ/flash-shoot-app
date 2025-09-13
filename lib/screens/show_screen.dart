@@ -114,6 +114,38 @@ class _ShowScreenState extends State<ShowScreen> {
     }
   }
 
+  /// 打开全屏预览（支持左右滑动）
+  void _openImagePreview(int initialIndex) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+          ),
+          body: PageView.builder(
+            controller: PageController(initialPage: initialIndex),
+            itemCount: imageUrls.length,
+            itemBuilder: (context, index) {
+              final imgUrl = imageUrls[index];
+              return Center(
+                child: InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Image.network(
+                    '${widget.baseUrl}$imgUrl',
+                    fit: BoxFit.contain, // 居中显示
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -163,7 +195,8 @@ class _ShowScreenState extends State<ShowScreen> {
                     final selected = selectedIndices.contains(index);
 
                     return GestureDetector(
-                      onTap: () => _toggleSelection(index),
+                      onTap: () => _openImagePreview(index), // 👉 点击预览（可左右滑）
+                      onLongPress: () => _toggleSelection(index), // 👉 长按选择
                       child: Stack(
                         fit: StackFit.expand,
                         children: [

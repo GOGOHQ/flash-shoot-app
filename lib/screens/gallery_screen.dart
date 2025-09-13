@@ -285,6 +285,27 @@ class _GalleryScreenState extends State<GalleryScreen> {
             ? Text('${selectedIndices.length} selected')
             : const Text('Gallery'),
         actions: [
+              // 👁️ 眼睛按钮：无论是否多选模式都显示
+          IconButton(
+            icon: const Icon(Icons.remove_red_eye),
+            onPressed: () {
+              if (userId != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ShowScreen(
+                      baseUrl: baseUrl,
+                      userId: userId!,
+                    ),
+                  ),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('用户信息未初始化')),
+                );
+              }
+            },
+          ),
           if (selectionMode)
             IconButton(
               icon: const Icon(Icons.upload_file),
